@@ -242,5 +242,189 @@ test('cleanSettings accepts flinch levels and defaults to off', () => {
   assert.strictEqual(E.cleanSettings({ flinch: 'always' }).flinch, 'off');
 });
 
+/* ---------- Match: dealing, challenges, slaps, burns ---------- */
+const seats = n => Array.from({ length: n }, (_, i) => ({ name: i ? 'Bot ' + i : 'You', bot: i ? 'club' : null }));
+const cardKey = c => c.rank * 10 + c.suit;
+function allCards(m) { return [...m.pile, ...m.burn, ...m.players.flatMap(p => p.hand)]; }
+// A match with hand-picked hands (ranks only), for walking through the rules step by step.
+function rigged(hands, first = 0, burn = 1) {
+  const m = E.newMatch(seats(hands.length), { first, burn });
+  m.players.forEach((p, i) => { p.hand = hands[i].map((r, j) => E.newCard(r, (i + j) % 4)); });
+  return m;
+}
+function playOut(m) { const nx = E.matchNext(m); assert.strictEqual(nx.type, 'play', JSON.stringify(nx)); return E.matchPlay(m, nx.by); }
+
+test('newMatch deals all 52 cards evenly round the table', () => {
+  for (const [n, sizes] of [[2, [26, 26]], [3, [18, 17, 17]], [4, [13, 13, 13, 13]]]) {
+    const m = E.newMatch(seats(n));
+    assert.deepStrictEqual(m.players.map(p => p.hand.length), sizes);
+    assert.strictEqual(new Set(allCards(m).map(cardKey)).size, 52);
+    assert.strictEqual(m.turn, 1, 'the seat after you plays first');
+  }
+});
+test('J gives the next player 1 try; when it runs out the face card player collects and leads', () => {
+  const m = rigged([[11, 9], [5, 6, 7]]);
+  playOut(m);
+  assert.deepStrictEqual(m.challenge && [m.challenge.by, m.challenge.left], [0, 1]);
+  assert.strictEqual(m.turn, 1);
+  playOut(m);
+  assert.deepStrictEqual(E.matchNext(m), { type: 'collect', by: 0, why: 'face' });
+  const res = E.matchCollect(m, 0);
+  assert.strictEqual(res.count, 2);
+  assert.deepStrictEqual(m.players[0].hand.map(c => c.rank), [9, 11, 5], 'pile goes under the hand in play order');
+  assert.strictEqual(m.turn, 0);
+  assert.strictEqual(m.challenge, null);
+});
+test('Q, K and A give 2, 3 and 4 tries; a face card in reply passes the challenge back', () => {
+  for (const [face, tries] of [[12, 2], [13, 3], [1, 4]]) {
+    const m = rigged([[face], [2, 3, 4, 5, 6]]);
+    playOut(m);
+    for (let i = 0; i < tries; i++) playOut(m);
+    assert.deepStrictEqual(E.matchNext(m), { type: 'collect', by: 0, why: 'face' }, `${face} gives ${tries}`);
+  }
+  const m = rigged([[13, 2, 3], [4, 12, 5]]);
+  playOut(m); playOut(m); playOut(m); // K, 4, Q: now player 0 owes 2
+  assert.deepStrictEqual([m.challenge.by, m.challenge.left, m.turn], [1, 2, 0]);
+});
+test('a responder who runs out mid-challenge hands the remaining tries to the next player', () => {
+  const m = rigged([[12, 9], [4], [5, 6]]);
+  playOut(m); // Q by 0
+  playOut(m); // 4 by 1, who is now empty
+  assert.strictEqual(m.challenge.left, 1);
+  assert.deepStrictEqual(E.matchNext(m), { type: 'play', by: 2 });
+  playOut(m); // 5 by 2
+  assert.deepStrictEqual(E.matchNext(m), { type: 'collect', by: 0, why: 'face' });
+});
+test('a face card nobody else can answer goes straight to its player', () => {
+  const m = rigged([[13, 9], []]);
+  playOut(m);
+  assert.deepStrictEqual(E.matchNext(m), { type: 'collect', by: 0, why: 'face' });
+});
+test('nobody left to play: the last player collects', () => {
+  const m = rigged([[7], []]);
+  playOut(m);
+  assert.deepStrictEqual(E.matchNext(m), { type: 'collect', by: 0, why: 'empty' });
+});
+test('players with no cards are skipped, stay in until the pile is won, then go out', () => {
+  const m = rigged([[2, 3], [], [4, 5]]);
+  playOut(m);
+  assert.deepStrictEqual(E.matchNext(m), { type: 'play', by: 2 });
+  assert.strictEqual(m.players[1].out, false, 'still in while the pile is live');
+  const res = E.matchCollect(m, 2);
+  assert.deepStrictEqual(res.knocked, [1]);
+  assert.strictEqual(m.players[1].out, true);
+});
+test('false slaps burn face down under the pile and never change the top-bottom card', () => {
+  const m = rigged([[9, 4, 6], [7, 8, 10]], 0, 2);
+  playOut(m); playOut(m);
+  const bottom = m.pile[0];
+  const r = E.matchBurn(m, 1);
+  assert.deepStrictEqual(r, { burned: 2, out: false });
+  assert.strictEqual(m.pile[0], bottom);
+  assert.strictEqual(m.burn.length, 2);
+  assert.strictEqual(m.players[1].hand.length, 0);
+  E.matchCollect(m, 0);
+  assert.strictEqual(m.players[0].hand.length, 2 + 2 + 2, 'winner gets the pile and the burned cards');
+});
+test('a false slap with no cards knocks you out, and voids a face card you laid', () => {
+  const m = rigged([[13], [2, 3, 4]]);
+  playOut(m); // K by 0, who is now empty
+  const r = E.matchBurn(m, 0);
+  assert.deepStrictEqual(r, { burned: 0, out: true });
+  assert.strictEqual(m.challenge, null);
+  assert.deepStrictEqual(E.matchOver(m), { winner: 1 });
+  assert.strictEqual(E.matchResult(m, 'out'), 'lost');
+});
+test('matchResult for a timed match: most cards in hand wins, ties draw', () => {
+  const m = rigged([[2, 3, 4], [5, 6], [7]]);
+  assert.strictEqual(E.matchResult(m, 'time'), 'won');
+  m.players[1].hand.push(E.newCard(8));
+  assert.strictEqual(E.matchResult(m, 'time'), 'draw');
+  m.players[1].hand.push(E.newCard(9));
+  assert.strictEqual(E.matchResult(m, 'time'), 'lost');
+});
+test('2,000 random games keep every card, never let an empty or out player play, and finish', () => {
+  let finished = 0, steps = 0;
+  for (let g = 0; g < 2000; g++) {
+    const m = E.newMatch(seats(2 + (g % 3)), { burn: 1 + (g % 2) });
+    for (let s = 0; s < 20000; s++) {
+      const nx = E.matchNext(m);
+      if (nx.type === 'collect') {
+        assert.ok(!m.players[nx.by].out, 'collector is in the game');
+        E.matchCollect(m, nx.by);
+      } else {
+        assert.ok(m.players[nx.by].hand.length > 0 && !m.players[nx.by].out, 'player has cards');
+        E.matchPlay(m, nx.by);
+        const alive = E.matchAlive(m), who = alive[Math.floor(Math.random() * alive.length)];
+        if (E.patternsOf(m.pile, DEFAULT_RULES).length && Math.random() < 0.7) E.matchCollect(m, who);
+        else if (Math.random() < 0.08) E.matchBurn(m, who);
+      }
+      const cards = allCards(m);
+      assert.strictEqual(cards.length, 52);
+      assert.strictEqual(new Set(cards.map(cardKey)).size, 52);
+      for (const p of m.players) assert.ok(!(p.out && p.hand.length), 'out players hold nothing');
+      steps++;
+      if (E.matchOver(m)) { finished++; break; }
+    }
+  }
+  console.log(`     ${finished} of 2000 games finished, ${Math.round(steps / 2000)} steps on average`);
+  assert.ok(finished >= 1990);
+});
+
+/* ---------- Bots ---------- */
+function botStats(key, ctx, n = 20000) {
+  let slaps = 0, sum = 0;
+  for (let i = 0; i < n; i++) { const rt = E.botReaction(key, ctx); if (rt !== null) { slaps++; sum += rt; } }
+  return { rate: slaps / n, mean: slaps ? sum / slaps : null };
+}
+test('bot profiles: speed and miss rate on real patterns', () => {
+  for (const [key, rt, miss] of [['casual', 520, 0.2], ['club', 400, 0.08], ['shark', 300, 0.03]]) {
+    const s = botStats(key, { valid: true, ownCard: false, hasCards: true });
+    assert.ok(Math.abs(s.mean - rt) < 12, `${key} mean ${s.mean}`);
+    assert.ok(Math.abs(1 - s.rate - miss) < 0.012, `${key} miss ${1 - s.rate}`);
+  }
+  const casualFalse = botStats('casual', { valid: false, hasCards: true }).rate;
+  assert.ok(casualFalse > 0 && casualFalse < 0.02, 'Casual rarely false-slaps');
+});
+test('Spammer slaps nearly every card while it has cards, and never false-slaps without', () => {
+  const s = botStats('spammer', { valid: false, hasCards: true });
+  assert.ok(s.rate > 0.85 && Math.abs(s.mean - 200) < 10, JSON.stringify(s));
+  assert.strictEqual(botStats('spammer', { valid: false, hasCards: false }).rate, 0);
+});
+test('Counter knows its own deck: about 170 ms when its own card makes the pattern', () => {
+  const own = botStats('counter', { valid: true, ownCard: true, hasCards: true });
+  const other = botStats('counter', { valid: true, ownCard: false, hasCards: true });
+  assert.ok(Math.abs(own.mean - 170) < 8 && own.rate === 1, JSON.stringify(own));
+  assert.ok(Math.abs(other.mean - 300) < 12, 'Shark speed otherwise');
+});
+test('slapRace: the earliest slap wins', () => {
+  assert.deepStrictEqual(E.slapRace([{ who: 0, rt: 340 }, { who: 2, rt: 296 }, { who: 1, rt: null }]).winner, 2);
+  assert.strictEqual(E.slapRace([{ who: 0, rt: null }]).winner, null);
+});
+
+/* ---------- Ladder, settings and history ---------- */
+test('ladder: beating a bot one-on-one unlocks the next', () => {
+  assert.deepStrictEqual(E.ladderUnlocked(E.cleanLadder(null)), ['casual']);
+  assert.deepStrictEqual(E.ladderUnlocked(E.cleanLadder({ beaten: { casual: true } })), ['casual', 'club']);
+  assert.deepStrictEqual(E.ladderUnlocked(E.cleanLadder({ beaten: { casual: true, club: true, shark: 'yes' } })), ['casual', 'club', 'shark']);
+});
+test('cleanSettings: match settings default sensibly and reject bad lineups', () => {
+  const d = E.cleanSettings({});
+  assert.deepStrictEqual([d.matchOpp, d.ladderBot, d.matchLen, d.burn], ['ladder', 'casual', 'full', 1]);
+  assert.strictEqual(E.cleanSettings({ mode: 'match' }).mode, 'match');
+  assert.deepStrictEqual(E.cleanSettings({ freeBots: { shark: 3 } }).freeBots, { casual: 0, club: 0, shark: 3, spammer: 0, counter: 0 });
+  assert.deepStrictEqual(E.cleanSettings({ freeBots: { shark: 4 } }).freeBots, d.freeBots, 'more than 3 bots');
+  assert.deepStrictEqual(E.cleanSettings({ freeBots: { shark: 2, club: 2 } }).freeBots, d.freeBots, 'total over 3');
+  assert.deepStrictEqual(E.cleanSettings({ freeBots: {} }).freeBots, d.freeBots, 'no bots');
+  assert.strictEqual(E.cleanSettings({ burn: 3 }).burn, 1);
+  for (const k of Object.keys(V1_SETTINGS)) assert.deepStrictEqual(E.cleanSettings(V1_SETTINGS)[k], V1_SETTINGS[k], 'v1 fields survive: ' + k);
+});
+test('cleanHistory keeps match entries and their new fields', () => {
+  const h = E.cleanHistory([{ at: 5, mode: 'match', acc: 40, avg: 380, falses: 2, pace: 900, deck: 'real', result: 'won', opp: 'Shark' }, { at: 4, mode: 'match', result: 'maybe' }]);
+  assert.deepStrictEqual(h[0], { at: 5, mode: 'match', acc: 40, avg: 380, falses: 2, pace: 900, deck: 'real', result: 'won', opp: 'Shark' });
+  assert.strictEqual('result' in h[1], false);
+  assert.strictEqual(E.cleanHistory([{ at: 1, mode: 'bogus' }])[0].mode, 'live');
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exitCode = failed ? 1 : 0;

@@ -97,6 +97,19 @@ button { font: inherit; color: inherit; }
 .seat.on::before { background: var(--stock); }
 .seat-them { top: 14px; }
 .seat-you { bottom: 14px; }
+/* Match seats: you at the bottom, bots around the pile */
+.mseats { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+.mseats .seat.pos-top { top: 14px; left: 50%; transform: translateX(-50%); }
+.mseats .seat.pos-left, .mseats .seat.pos-right { top: var(--seat-y, 45%); transform: translateY(-50%); flex-direction: column; gap: 3px; text-align: center; }
+.mseats .seat.pos-left { left: 10px; }
+.mseats .seat.pos-right { left: auto; right: 10px; }
+.mseats .seat.pos-you { bottom: 14px; }
+.seat-n { color: var(--text); font-variant-numeric: tabular-nums; letter-spacing: .04em; }
+.seat.out { opacity: .45; }
+.seat.burnt { animation: burnt 600ms ease-out; }
+@keyframes burnt { from { color: var(--false); } }
+.felt.match .felt-inner { padding-top: 52px; padding-bottom: 48px; }
+.felt.match .chip { top: auto; bottom: 11px; }
 .chip { position: absolute; top: 11px; right: 14px; z-index: 2; padding: 4px 10px; border-radius: 999px; border: 1px solid rgba(246, 239, 226, .4); background: rgba(246, 239, 226, .08); color: var(--stock); font-weight: 700; font-size: .76rem; font-stretch: 85%; }
 
 /* Fake flinch: a hand darts in from the edge toward the pile and back */
@@ -131,7 +144,7 @@ button { font: inherit; color: inherit; }
 .card.face.drop { --from: -22px; animation: land 110ms cubic-bezier(.2, .9, .25, 1) both; }
 .card.face.drop.from-you { --from: 22px; }
 @keyframes land {
-  from { transform: translate(var(--dx, 0px), calc(var(--dy, 0px) + var(--from, -22px))) rotate(calc(var(--rot, 0deg) - 9deg)) scale(1.05); }
+  from { transform: translate(calc(var(--dx, 0px) + var(--fromx, 0px)), calc(var(--dy, 0px) + var(--from, -22px))) rotate(calc(var(--rot, 0deg) - 9deg)) scale(1.05); }
   to { transform: translate(var(--dx, 0px), var(--dy, 0px)) rotate(var(--rot, 0deg)) scale(1); }
 }
 .spot { position: absolute; inset: 0; border-radius: calc(var(--cw) * .075); border: 2px dashed rgba(246, 239, 226, .22); }
@@ -193,6 +206,8 @@ fieldset.settings:disabled { opacity: .5; }
 .rules { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .rule { appearance: none; display: grid; gap: 3px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--rule); background: transparent; text-align: left; cursor: pointer; }
 .rule:hover { border-color: var(--muted); }
+.rule:disabled { opacity: .45; cursor: default; }
+.rule:disabled:hover { border-color: var(--rule); }
 .rule[aria-pressed="true"] { background: var(--stock); border-color: var(--stock); color: var(--ink); }
 .rule-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 2px 8px; }
 .rule-name { font-weight: 700; }
@@ -200,16 +215,27 @@ fieldset.settings:disabled { opacity: .5; }
 .rule[aria-pressed="true"] .rule-eg { color: var(--suit-red); }
 .rule-desc { font-size: .8rem; line-height: 1.35; opacity: .8; }
 .seg { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); border: 1px solid var(--rule); border-radius: 12px; overflow: hidden; }
-.seg button { appearance: none; display: grid; gap: 1px; justify-items: center; padding: 9px 4px; border: 0; background: transparent; font-size: .92rem; font-weight: 600; line-height: 1.15; text-align: center; cursor: pointer; }
+.seg button { appearance: none; display: grid; gap: 1px; justify-items: center; align-content: center; min-height: 44px; padding: 9px 4px; border: 0; background: transparent; font-size: .92rem; font-weight: 600; line-height: 1.15; text-align: center; cursor: pointer; }
 .seg button + button { border-left: 1px solid var(--rule); }
 .seg button small { font-size: .72rem; font-weight: 500; opacity: .75; font-variant-numeric: tabular-nums; }
 .seg button[aria-pressed="true"] { background: var(--stock); color: var(--ink); }
 .seg button:hover:not([aria-pressed="true"]) { background: rgba(246, 239, 226, .06); }
 .seg button:focus-visible { outline: 2px solid var(--stock); outline-offset: -4px; }
-.check { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; font-size: .9rem; line-height: 1.4; cursor: pointer; }
+.check { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; min-height: 44px; font-size: .9rem; line-height: 1.4; cursor: pointer; }
 .check input { width: 18px; height: 18px; margin: 1px 0 0; accent-color: var(--stock); cursor: pointer; }
 .check b { color: var(--stock); font-weight: 700; }
 .check:has(input:disabled) { opacity: .5; cursor: default; }
+.free { display: grid; gap: 8px; }
+.free-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 6px 6px 6px 12px; border: 1px solid var(--rule); border-radius: 12px; }
+.free-row.on { border-color: var(--stock); }
+.free-name { display: grid; gap: 2px; font-size: .8rem; line-height: 1.35; color: var(--muted); }
+.free-name b { color: var(--text); font-size: .95rem; }
+.stepper { display: flex; align-items: center; gap: 4px; }
+.step { appearance: none; width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--rule); background: transparent; font-size: 1.25rem; font-weight: 700; line-height: 1; cursor: pointer; }
+.step:hover:not(:disabled) { border-color: var(--muted); }
+.step:disabled { opacity: .35; cursor: default; }
+.step:focus-visible { outline: 2px solid var(--stock); outline-offset: 2px; }
+.count { min-width: 1.4em; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
 
 /* Results */
 .tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
@@ -250,6 +276,18 @@ fieldset.settings:disabled { opacity: .5; }
 .mistake.k-false { --mk: var(--false); }
 .mk-label { font-weight: 700; font-size: .92rem; line-height: 1.3; }
 .mk-time { font-size: .78rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+/* Card-count chart */
+.chart { display: grid; gap: 6px; margin: 0; }
+.chart-cap { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 10px; }
+.chart-read { font-size: .8rem; color: var(--text); font-variant-numeric: tabular-nums; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; touch-action: pan-y; }
+.chart .grid { stroke: var(--rule); stroke-width: 1; }
+.chart .even { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 4; opacity: .6; }
+.chart .line { fill: none; stroke: var(--stock); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart .tick { fill: var(--muted); font: 600 10px var(--body); font-variant-numeric: tabular-nums; }
+.chart .end { fill: var(--stock); font: 700 11px var(--body); font-variant-numeric: tabular-nums; }
+.chart .xhair { stroke: var(--muted); stroke-width: 1; }
+.chart .dot { fill: var(--stock); stroke: var(--raise); stroke-width: 2; }
 
 /* How it works + history */
 .steps { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; counter-reset: step; }
@@ -296,14 +334,15 @@ fieldset.settings:disabled { opacity: .5; }
     <div class="hud">
       <div class="hud-item"><span class="label" id="hudL1">Patterns</span><span class="hud-val" id="hudPatterns">0 / 20</span></div>
       <div class="hud-item"><span class="label" id="hudL2">Caught</span><span class="hud-val" id="hudCaught">0</span></div>
-      <div class="hud-item"><span class="label">False slaps</span><span class="hud-val" id="hudFalse">0</span></div>
-      <div class="hud-item"><span class="label">Pace</span><span class="hud-val" id="hudPace">900 ms</span></div>
+      <div class="hud-item"><span class="label" id="hudL3">False slaps</span><span class="hud-val" id="hudFalse">0</span></div>
+      <div class="hud-item"><span class="label" id="hudL4">Pace</span><span class="hud-val" id="hudPace">900 ms</span></div>
     </div>
 
     <div class="felt" id="felt" tabindex="0" role="region" aria-label="Card table" aria-describedby="keysHint">
       <span class="seat seat-them" id="seatThem" hidden>Them</span>
       <span class="chip" id="chip" hidden></span>
       <div class="hand" id="hand" aria-hidden="true"><svg viewBox="0 0 64 96" focusable="false"><g class="palm"><rect x="14" y="10" width="9" height="42" rx="4.5"/><rect x="24" y="4" width="9" height="48" rx="4.5"/><rect x="34" y="7" width="9" height="45" rx="4.5"/><rect x="44" y="15" width="8" height="37" rx="4"/><rect x="12" y="36" width="41" height="36" rx="13"/><rect x="2" y="38" width="9" height="28" rx="4.5" transform="rotate(-28 6.5 52)"/></g><rect class="cuff" x="15" y="68" width="35" height="28" rx="4"/></svg></div>
+      <div class="mseats" id="mSeats" hidden></div>
       <div class="felt-inner">
         <span class="pile-tag" id="pileTag">New pile</span>
         <div class="pile" id="pile"></div>
@@ -346,6 +385,9 @@ fieldset.settings:disabled { opacity: .5; }
           <tbody id="rRows"></tbody>
         </table>
       </div>
+      <figure class="chart" id="rChart" hidden>
+        <figcaption class="chart-cap"><span class="label">Your cards over time</span><span class="chart-read" id="chartRead"></span></figcaption>
+      </figure>
       <ul class="coach" id="rCoach"></ul>
       <div class="mistakes-wrap" id="mistakesWrap" hidden>
         <h3>Mistakes</h3>
@@ -364,12 +406,28 @@ fieldset.settings:disabled { opacity: .5; }
           <div class="seg" id="modeSeg" role="group" aria-labelledby="modeLabel"></div>
           <p class="note" id="modeNote"></p>
         </div>
-        <div class="group" data-only="live">
+        <div class="group" data-only="match">
+          <span class="label" id="oppLabel">Opponents</span>
+          <div class="seg" id="oppSeg" role="group" aria-labelledby="oppLabel"></div>
+          <div class="rules" id="ladderBots" role="group" aria-label="Ladder opponent"></div>
+          <div class="free" id="freeBots" role="group" aria-label="Free play lineup"></div>
+          <p class="note" id="oppNote"></p>
+        </div>
+        <div class="group" data-only="match">
+          <span class="label" id="mlenLabel">Match length</span>
+          <div class="seg" id="mlenSeg" role="group" aria-labelledby="mlenLabel"></div>
+          <p class="note">Five minutes: whoever holds the most cards when time runs out wins.</p>
+        </div>
+        <div class="group" data-only="match">
+          <span class="label" id="burnLabel">A false slap burns</span>
+          <div class="seg" id="burnSeg" role="group" aria-labelledby="burnLabel"></div>
+        </div>
+        <div class="group" data-only="live match">
           <span class="label" id="rulesLabel">Slap on</span>
           <div class="rules" id="rules" role="group" aria-labelledby="rulesLabel"></div>
           <p class="note" id="rulesNote">Match the rules your group plays.</p>
         </div>
-        <div class="group">
+        <div class="group" data-only="live comeback match">
           <span class="label" id="paceLabel">Pace: time before the next card lands</span>
           <div class="seg" id="paceSeg" role="group" aria-labelledby="paceLabel"></div>
           <label class="check" for="adaptive" data-only="live"><input type="checkbox" id="adaptive"><span><b>Adapt to me.</b> Deals faster while you're clean and slower when you miss.</span></label>
@@ -380,7 +438,7 @@ fieldset.settings:disabled { opacity: .5; }
           <p class="note" id="deckNote"></p>
           <label class="check" for="focus"><input type="checkbox" id="focus"><span><b>Focus on my weak spots.</b> Deals more of the rules you're slowest at or miss most, and more of the near-misses you fall for. Drill mix only.</span></label>
         </div>
-        <div class="group" data-only="live">
+        <div class="group" data-only="live match">
           <span class="label" id="flinchLabel">Fake flinches</span>
           <div class="seg" id="flinchSeg" role="group" aria-labelledby="flinchLabel"></div>
           <p class="note">A hand darts toward the pile on some cards, and now and then a beat late on a real pattern. A false slap within 300 ms of one counts as taking the bait.</p>
@@ -407,6 +465,11 @@ fieldset.settings:disabled { opacity: .5; }
         <li><span>Cards land one at a time. Once a card is covered you can't see it again, same as a real pile.</span></li>
         <li><span>Press <kbd>Space</kbd> or tap the table when the top card completes one of your rules. You have until the next card lands.</span></li>
         <li><span>Each catch shows your reaction time. Memory checks pause the deal and ask what's under the top card or what started the pile.</span></li>
+      </ol>
+      <ol class="steps" data-only="match">
+        <li><span>You and 1 to 3 bots split a shuffled deck. Cards are played for everyone in turn at your pace. Your seat is at the bottom of the table.</span></li>
+        <li><span>Slap on your house rules. The fastest valid slap takes the pile, bots included, and the feedback says who got it and how fast. A false slap burns cards face down under the pile.</span></li>
+        <li><span>J, Q, K and A give the next player 1, 2, 3 or 4 tries. If they run out, the face card's owner takes the pile. Out of cards, you can still slap back in until the pile is won. Beat a bot one-on-one to unlock the next.</span></li>
       </ol>
       <ol class="steps" data-only="comeback">
         <li><span>You and one other player take turns. Your cards come in from the bottom of the table, theirs from the top. Face cards work as usual: J, Q, K and A give the other player 1, 2, 3 or 4 tries to answer.</span></li>
@@ -758,10 +821,146 @@ fieldset.settings:disabled { opacity: .5; }
     return parts.join(' · ');
   }
 
+  /* ---------- Match: a full game against bots ---------- */
+  // Hands are top-first: hand[0] is the next card that player plays.
+  const BOTS = {
+    casual: { name: 'Casual', rt: 520, sd: 70, miss: 0.2, falseRate: 0.01, desc: 'About 520 ms. Misses 1 pattern in 5 and rarely false-slaps.' },
+    club: { name: 'Club', rt: 400, sd: 55, miss: 0.08, falseRate: 0.01, desc: 'About 400 ms. Misses 8% of patterns.' },
+    shark: { name: 'Shark', rt: 300, sd: 40, miss: 0.03, falseRate: 0.005, desc: 'About 300 ms. Misses 3% of patterns.' },
+    spammer: { name: 'Spammer', rt: 200, sd: 30, miss: 0.03, spam: 0.9, desc: 'Slaps nearly every card at about 200 ms while it has cards.' },
+    counter: { name: 'Counter', rt: 300, sd: 40, miss: 0.03, falseRate: 0.005, counter: 170, desc: 'Shark speed, and it knows its own deck: about 170 ms when its own card makes the pattern.' },
+  };
+  const BOT_ORDER = ['casual', 'club', 'shark', 'spammer', 'counter'];
+  const OPPS = [{ v: 'ladder', name: 'Ladder' }, { v: 'free', name: 'Free play' }];
+  const MATCH_LENGTHS = [{ v: 'full', name: 'Full game' }, { v: 'timed', name: '5 minutes' }];
+  const BURNS = [1, 2];
+  function gauss(mu, sd) {
+    let u = 0;
+    while (!u) u = random();
+    return mu + sd * Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * random());
+  }
+  // How long after the card lands this bot slaps it, or null if it doesn't.
+  // ctx: { valid: the pile shows a pattern, ownCard: the bot played it, hasCards }
+  function botReaction(key, ctx) {
+    const b = BOTS[key];
+    if (!b) return null;
+    if (ctx.valid) {
+      if (b.counter && ctx.ownCard) return Math.max(120, gauss(b.counter, 18));
+      if (random() < b.miss) return null;
+      return Math.max(140, gauss(b.rt, b.sd));
+    }
+    if (!ctx.hasCards) return null; // a false slap with no cards would knock it out
+    if (b.spam) return random() < b.spam ? Math.max(120, gauss(b.rt, b.sd)) : null;
+    return random() < (b.falseRate || 0) ? Math.max(140, gauss(b.rt, b.sd)) : null;
+  }
+  // The earliest slap wins. attempts: [{ who, rt }], rt null when that player didn't slap.
+  function slapRace(attempts) {
+    const field = attempts.filter(a => typeof a.rt === 'number').sort((a, b) => a.rt - b.rt);
+    return { winner: field.length ? field[0].who : null, rt: field.length ? field[0].rt : null, field };
+  }
+
+  // seats: [{ name, bot }], seat 0 is you. The 52 cards are dealt round the table.
+  function newMatch(seats, opts) {
+    const o = opts || {};
+    const deck = [];
+    for (let r = 1; r <= 13; r++) for (let s = 0; s < 4; s++) deck.push(newCard(r, s));
+    shuffle(deck);
+    const players = seats.map((s, i) => ({ id: i, name: s.name, bot: s.bot || null, hand: [], out: false }));
+    deck.forEach((c, i) => players[i % players.length].hand.push(c));
+    return { players, pile: [], burn: [], turn: typeof o.first === 'number' ? o.first : 1 % players.length, challenge: null, lastPlayer: -1, burnN: o.burn === 2 ? 2 : 1 };
+  }
+  // Next seat after `from` that still holds cards. Can be `from` itself; -1 when nobody has cards.
+  function nextSeat(m, from) {
+    const n = m.players.length;
+    for (let k = 1; k <= n; k++) {
+      const i = (((from + k) % n) + n) % n, p = m.players[i];
+      if (!p.out && p.hand.length) return i;
+    }
+    return -1;
+  }
+  function nextAlive(m, from) {
+    const n = m.players.length;
+    for (let k = 0; k < n; k++) { const i = (((from + k) % n) + n) % n; if (!m.players[i].out) return i; }
+    return -1;
+  }
+  // What happens once the top card's slap window closes: someone plays, or someone collects.
+  function matchNext(m) {
+    const ch = m.challenge;
+    if (ch && ch.left <= 0) return { type: 'collect', by: ch.by, why: 'face' };
+    let p = m.turn;
+    if (p < 0 || m.players[p].out || !m.players[p].hand.length) p = nextSeat(m, p < 0 ? m.lastPlayer : p);
+    // A face card nobody else can answer goes to the player who laid it.
+    if (ch && (p < 0 || p === ch.by)) return { type: 'collect', by: ch.by, why: 'face' };
+    if (p < 0) return { type: 'collect', by: nextAlive(m, m.lastPlayer), why: 'empty' };
+    return { type: 'play', by: p };
+  }
+  // J/Q/K/A give the next player 1/2/3/4 tries; they keep playing until a face card or they run out.
+  function matchPlay(m, p) {
+    const card = m.players[p].hand.shift();
+    card.owner = p;
+    m.pile.push(card);
+    m.lastPlayer = p;
+    if (isFace(card.rank)) { m.challenge = { by: p, left: FACE_COUNT[card.rank], rank: card.rank }; m.turn = nextSeat(m, p); }
+    else if (m.challenge) { m.challenge.left--; m.turn = p; }
+    else m.turn = nextSeat(m, p);
+    return card;
+  }
+  // The burned cards and the pile go under the winner's hand, in the order they were played.
+  // Anyone left with no cards once a pile is won is out.
+  function matchCollect(m, w) {
+    const won = m.burn.concat(m.pile);
+    m.players[w].hand.push(...won);
+    m.pile = []; m.burn = []; m.challenge = null; m.turn = w;
+    const knocked = [];
+    m.players.forEach((p, i) => { if (!p.out && !p.hand.length) { p.out = true; knocked.push(i); } });
+    return { count: won.length, knocked };
+  }
+  // A false slap burns cards face down under the pile (kept apart, so they never count for top-bottom).
+  // With no cards to burn, the slapper is out.
+  function matchBurn(m, i) {
+    const p = m.players[i];
+    if (p.out) return { burned: 0, out: false };
+    if (!p.hand.length) {
+      p.out = true;
+      if (m.challenge && m.challenge.by === i) m.challenge = null;
+      return { burned: 0, out: true };
+    }
+    const k = Math.min(m.burnN, p.hand.length);
+    m.burn.push(...p.hand.splice(0, k));
+    return { burned: k, out: false };
+  }
+  const matchAlive = m => m.players.filter(p => !p.out).map(p => p.id);
+  function matchOver(m) {
+    const alive = matchAlive(m);
+    return alive.length <= 1 ? { winner: alive.length ? alive[0] : -1 } : null;
+  }
+  // Timed matches: every seat tied for the most cards in hand.
+  function matchLeaders(m) {
+    const best = Math.max(...m.players.map(p => p.hand.length));
+    return m.players.filter(p => p.hand.length === best).map(p => p.id);
+  }
+  // Your result. reason: 'over' (one player left), 'out' (you were knocked out) or 'time'.
+  function matchResult(m, reason) {
+    if (reason === 'out') return 'lost';
+    if (reason === 'time') { const lead = matchLeaders(m); return !lead.includes(0) ? 'lost' : lead.length > 1 ? 'draw' : 'won'; }
+    const over = matchOver(m);
+    return over && over.winner === 0 ? 'won' : 'lost';
+  }
+
+  // Ladder: Casual is always open; beating a bot one-on-one opens the next one.
+  const KEY_LADDER = 'ew-trainer.ladder.v1';
+  function cleanLadder(x) {
+    const beaten = {};
+    for (const k of BOT_ORDER) beaten[k] = !!(x && x.beaten && x.beaten[k] === true);
+    return { beaten };
+  }
+  const ladderUnlocked = l => BOT_ORDER.filter((k, i) => i === 0 || l.beaten[BOT_ORDER[i - 1]]);
+
   /* ---------- Settings and state ---------- */
   const MODES = [
     { v: 'live', name: 'Live patterns', note: `Spot patterns the instant they land and keep track of what's buried.` },
     { v: 'comeback', name: 'Comebacks', note: 'Two players. Win a pile, remember how it ended, then catch it when your own cards bring it back. Uses doubles and sandwiches.' },
+    { v: 'match', name: 'Match', note: 'A real game against 1 to 3 bots, slapping on your Live patterns house rules. The fastest valid slap takes the pile, and the last player with cards wins.' },
   ];
   const PACES = [
     { v: 1200, name: 'Warm-up' },
@@ -777,7 +976,8 @@ fieldset.settings:disabled { opacity: .5; }
   const LENGTHS = [10, 20, 40];
   const PILE_COUNTS = [4, 8, 12];
   const PACE_MIN = 350, PACE_MAX = 1800, LATE_WINDOW = 450;
-  const DEFAULTS = { mode: 'live', rules: { double: true, sandwich: true, topbottom: true, tens: false, marriage: false, run: false }, pace: 900, adaptive: true, deck: 'drill', memory: true, assist: false, length: 20, piles: 8, focus: true, flinch: 'off' };
+  const DEFAULTS = { mode: 'live', rules: { double: true, sandwich: true, topbottom: true, tens: false, marriage: false, run: false }, pace: 900, adaptive: true, deck: 'drill', memory: true, assist: false, length: 20, piles: 8, focus: true, flinch: 'off',
+    matchOpp: 'ladder', ladderBot: 'casual', freeBots: { casual: 1, club: 1, shark: 0, spammer: 0, counter: 0 }, matchLen: 'full', burn: 1 };
   const KEY_SETTINGS = 'ew-trainer.settings.v1', KEY_HISTORY = 'ew-trainer.history.v1';
 
   function cleanSettings(s) {
@@ -790,17 +990,36 @@ fieldset.settings:disabled { opacity: .5; }
     for (const k of ['adaptive', 'memory', 'assist', 'focus']) if (typeof s[k] === 'boolean') out[k] = s[k];
     if (DECKS.some(d => d.v === s.deck)) out.deck = s.deck;
     if (FLINCHES.some(f => f.v === s.flinch)) out.flinch = s.flinch;
+    if (OPPS.some(o => o.v === s.matchOpp)) out.matchOpp = s.matchOpp;
+    if (BOT_ORDER.includes(s.ladderBot)) out.ladderBot = s.ladderBot;
+    if (s.freeBots && typeof s.freeBots === 'object') {
+      const fb = {};
+      for (const k of BOT_ORDER) fb[k] = Number.isInteger(s.freeBots[k]) && s.freeBots[k] >= 0 && s.freeBots[k] <= 3 ? s.freeBots[k] : 0;
+      const total = BOT_ORDER.reduce((a, k) => a + fb[k], 0);
+      if (total >= 1 && total <= 3) out.freeBots = fb;
+    }
+    if (MATCH_LENGTHS.some(o => o.v === s.matchLen)) out.matchLen = s.matchLen;
+    if (BURNS.includes(s.burn)) out.burn = s.burn;
     if (LENGTHS.includes(s.length)) out.length = s.length;
     if (PILE_COUNTS.includes(s.piles)) out.piles = s.piles;
     return out;
   }
   const num = v => (typeof v === 'number' && isFinite(v) ? Math.round(v) : null);
+  const HISTORY_MODES = ['live', 'comeback', 'match', 'math'], RESULTS = ['won', 'lost', 'draw'];
   function cleanHistory(list) {
     if (!Array.isArray(list)) return [];
-    return list.filter(h => h && num(h.at) !== null).map(h => ({
-      at: num(h.at), mode: h.mode === 'comeback' ? 'comeback' : 'live', acc: num(h.acc) || 0, avg: num(h.avg),
-      falses: num(h.falses) || 0, pace: num(h.pace) || 0, deck: h.deck === 'real' ? 'real' : 'drill',
-    })).slice(0, 12);
+    return list.filter(h => h && num(h.at) !== null).map(h => {
+      const out = {
+        at: num(h.at), mode: HISTORY_MODES.includes(h.mode) ? h.mode : 'live', acc: num(h.acc) || 0, avg: num(h.avg),
+        falses: num(h.falses) || 0, pace: num(h.pace) || 0, deck: h.deck === 'real' ? 'real' : 'drill',
+      };
+      // Fields added later; older entries simply don't have them.
+      if (RESULTS.includes(h.result)) out.result = h.result;
+      if (typeof h.opp === 'string') out.opp = h.opp.slice(0, 60);
+      if (num(h.score) !== null) out.score = num(h.score);
+      if (num(h.dur) !== null) out.dur = num(h.dur);
+      return out;
+    }).slice(0, 12);
   }
 
   root.EWT = {
@@ -815,6 +1034,8 @@ fieldset.settings:disabled { opacity: .5; }
     MISTAKE_CAP, pileTail, mistakeLabel, mistakeTiming,
     KEY_WEAK, LURE_TYPES, cleanWeak, addRoundToWeak, ruleWeakness, ruleShares, lureShares, focusPlan, focusText, targetCardFor, lureCardOf,
     FLINCHES, FLINCH_RATE, BAIT_WINDOW, flinchPlan, tookBait,
+    BOTS, BOT_ORDER, OPPS, MATCH_LENGTHS, BURNS, botReaction, slapRace, newMatch, nextSeat, matchNext, matchPlay, matchCollect, matchBurn, matchAlive, matchOver, matchLeaders, matchResult,
+    KEY_LADDER, cleanLadder, ladderUnlocked,
   };
 })(window);
 </script>
@@ -832,6 +1053,8 @@ fieldset.settings:disabled { opacity: .5; }
     MISTAKE_CAP, pileTail, mistakeLabel, mistakeTiming,
     KEY_WEAK, cleanWeak, addRoundToWeak, focusPlan, focusText,
     FLINCHES, flinchPlan, tookBait,
+    BOTS, BOT_ORDER, OPPS, MATCH_LENGTHS, BURNS, botReaction, newMatch, matchNext, matchPlay, matchCollect, matchBurn, matchOver, matchResult,
+    KEY_LADDER, cleanLadder, ladderUnlocked,
   } = window.EWT;
 
   function load(key, fallback) { try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch (err) { return fallback; } }
@@ -845,6 +1068,7 @@ fieldset.settings:disabled { opacity: .5; }
     timer: 0, doneAt: 0, lastSummary: null, mistakes: [], mistakeCount: 0,
     history: cleanHistory(load(KEY_HISTORY, [])),
     weak: cleanWeak(load(KEY_WEAK, null)), plan: null, flinchTimer: 0, flinchAt: null,
+    ladder: cleanLadder(load(KEY_LADDER, null)),
   };
 
   function freshStats() {
@@ -855,6 +1079,7 @@ fieldset.settings:disabled { opacity: .5; }
   const running = () => S.phase !== 'idle' && S.phase !== 'done';
   const resolvedCount = () => (S.stats ? S.stats.hits + S.stats.late + S.stats.miss : 0);
   const comebackMode = () => S.settings.mode === 'comeback';
+  const matchMode = () => S.settings.mode === 'match';
 
   /* ---------- Drawing ---------- */
   const $ = id => document.getElementById(id);
@@ -917,8 +1142,8 @@ fieldset.settings:disabled { opacity: .5; }
   function renderPile(drop) {
     drawPile(S.pile, drop);
     const n = S.pile.length;
-    const live = !comebackMode();
-    pileTag.textContent = live && S.settings.rules.topbottom ? 'New pile · remember this card' : 'New pile';
+    const live = S.settings.mode === 'live';
+    pileTag.textContent = (live || matchMode()) && S.settings.rules.topbottom ? 'New pile · remember this card' : 'New pile';
     pileTag.classList.toggle('on', n === 1 && running());
     assistEl.hidden = !(live && S.settings.assist && running());
     if (!assistEl.hidden) {
@@ -949,6 +1174,9 @@ fieldset.settings:disabled { opacity: .5; }
     }
   }
   function renderHud() {
+    $('hudL3').textContent = 'False slaps';
+    $('hudL4').textContent = 'Pace';
+    if (matchMode()) { renderMatchHud(); return; }
     const cb = comebackMode();
     $('hudL1').textContent = cb ? 'Piles' : 'Patterns';
     $('hudL2').textContent = cb ? 'Right calls' : 'Caught';
@@ -963,7 +1191,22 @@ fieldset.settings:disabled { opacity: .5; }
     $('hudFalse').textContent = String(S.stats ? S.stats.falses : 0);
     $('hudPace').textContent = `${Math.round(S.phase === 'idle' ? S.settings.pace : S.interval)} ms`;
   }
+  function renderMatchHud() {
+    const m = MT.m, st = MT.stats;
+    $('hudL1').textContent = 'Your cards';
+    $('hudL2').textContent = 'Slaps won';
+    $('hudL3').textContent = 'Burned';
+    $('hudPatterns').textContent = m ? String(m.players[0].hand.length) : '–';
+    $('hudCaught').textContent = String(m && st ? st.won : 0);
+    $('hudFalse').textContent = String(m && st ? st.burns : 0);
+    if (S.settings.matchLen !== 'timed') { $('hudPace').textContent = S.settings.pace + ' ms'; return; }
+    $('hudL4').textContent = 'Time left';
+    $('hudPace').textContent = clockText(m && MT.endsAt ? Math.max(0, MT.endsAt - (running() ? performance.now() : MT.endedAt || performance.now())) : MATCH_MS);
+  }
   function renderSeats() {
+    const mOn = matchMode() && running() && !!MT.m;
+    $('mSeats').hidden = !mOn;
+    if (mOn) { seatThem.hidden = seatYou.hidden = true; renderMatchSeats(); return; }
     const on = comebackMode() && running();
     seatThem.hidden = seatYou.hidden = !on;
     if (!on) { chipEl.hidden = true; return; }
@@ -983,10 +1226,9 @@ fieldset.settings:disabled { opacity: .5; }
   /* ---------- A round: shared start, live drill ---------- */
   function start() {
     if (running()) return;
-    clearTimeout(S.timer);
-    const cb = comebackMode();
+    clearRoundTimers();
+    const cb = comebackMode(), match = matchMode();
     stopReplay();
-    clearTimeout(S.flinchTimer);
     S.flinchAt = null;
     S.stats = freshStats();
     S.mistakes = []; S.mistakeCount = 0;
@@ -998,6 +1240,7 @@ fieldset.settings:disabled { opacity: .5; }
     promptEl.hidden = true; recallEl.hidden = true;
     felt.classList.add('live');
     felt.classList.toggle('cb', cb);
+    felt.classList.toggle('match', match);
     felt.focus({ preventScroll: true });
     if (window.matchMedia && window.matchMedia('(max-width: 880px)').matches) felt.scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' });
     if (cb) {
@@ -1005,6 +1248,8 @@ fieldset.settings:disabled { opacity: .5; }
       CB.turn = 'them'; CB.challenge = null; CB.collectBy = null;
       cbNewEpisode();
       say('', '', 'Win a pile first by slapping its pattern.');
+    } else if (match) {
+      matchStart();
     } else {
       S.plan = S.settings.deck === 'drill' && S.settings.focus ? focusPlan(S.weak, S.settings.rules) : null;
       S.pileCap = randInt(7, 16);
@@ -1014,7 +1259,7 @@ fieldset.settings:disabled { opacity: .5; }
     renderPile(false);
     renderSeats();
     renderHud();
-    S.timer = setTimeout(() => { if (S.phase === 'gap') { S.phase = 'live'; if (cb) cbPlay(); else placeCard(); } }, 900);
+    S.timer = match ? setTimeout(mStep, 900) : setTimeout(() => { if (S.phase === 'gap') { S.phase = 'live'; if (cb) cbPlay(); else placeCard(); } }, 900);
   }
 
   function placeCard() {
@@ -1065,6 +1310,7 @@ fieldset.settings:disabled { opacity: .5; }
     if (S.phase === 'idle') { start(); return; }
     if (S.phase === 'done') { if (performance.now() - S.doneAt > 900) start(); return; }
     if (comebackMode()) { cbSlap(t); return; }
+    if (matchMode()) { mSlap(t); return; }
     if (S.phase === 'recall') return;
     const e = S.top;
     if (S.phase === 'live' && e && e.primary && !e.resolved && e.shownAt && t >= e.shownAt) {
@@ -1163,17 +1409,24 @@ fieldset.settings:disabled { opacity: .5; }
     }, ok ? 700 : 1500);
   }
 
-  function finishSoon(delay) {
-    S.phase = 'ending';
+  // Every timer a round can leave running.
+  function clearRoundTimers() {
     clearTimeout(S.timer);
     clearTimeout(S.flinchTimer);
+    clearMatchTimers();
+    clearInterval(MT.clock);
+  }
+
+  function finishSoon(delay) {
+    S.phase = 'ending';
+    clearRoundTimers();
     S.timer = setTimeout(finish, delay);
   }
 
   function endUi() {
     settingsFs.disabled = false; lockNote.hidden = true;
     startBtn.hidden = false; stopBtn.hidden = true;
-    felt.classList.remove('live', 'cb');
+    felt.classList.remove('live', 'cb', 'match');
     recallEl.hidden = true;
     setHint(RECALL_HINT);
     assistEl.hidden = true;
@@ -1185,19 +1438,33 @@ fieldset.settings:disabled { opacity: .5; }
     if (S.phase !== 'ending') return;
     S.phase = 'done';
     S.doneAt = performance.now();
-    const cb = comebackMode();
-    const sum = cb ? summarizeCB() : summarize();
+    const cb = comebackMode(), match = matchMode();
+    const sum = cb ? summarizeCB() : match ? summarizeMatch() : summarize();
     S.lastSummary = sum;
     S.history.unshift(cb
       ? { at: sum.at, mode: 'comeback', acc: sum.acc, avg: sum.avg, falses: sum.falses, pace: sum.pace, deck: 'drill' }
-      : { at: sum.at, mode: 'live', acc: sum.acc, avg: sum.avg, falses: sum.falses, pace: sum.paceEnd, deck: sum.deck });
+      : match
+        ? { at: sum.at, mode: 'match', acc: sum.acc, avg: sum.avg, falses: sum.falses, pace: sum.pace, deck: 'real', result: sum.result, opp: sum.opp }
+        : { at: sum.at, mode: 'live', acc: sum.acc, avg: sum.avg, falses: sum.falses, pace: sum.paceEnd, deck: sum.deck });
     S.history = S.history.slice(0, 12);
     store(KEY_HISTORY, S.history);
-    if (!cb) { S.weak = addRoundToWeak(S.weak, S.stats); store(KEY_WEAK, S.weak); }
+    if (match) {
+      // Beating a bot one-on-one opens the next one on the ladder.
+      const bot = MT.lineup.length === 1 ? MT.lineup[0] : null;
+      if (sum.result === 'won' && bot && !S.ladder.beaten[bot]) {
+        S.ladder.beaten[bot] = true;
+        store(KEY_LADDER, S.ladder);
+        const next = BOT_ORDER[BOT_ORDER.indexOf(bot) + 1];
+        if (next) sum.unlocked = BOTS[next].name;
+        syncSettings();
+      }
+    } else if (!cb) { S.weak = addRoundToWeak(S.weak, S.stats); store(KEY_WEAK, S.weak); }
     endUi();
-    if (cb) renderResultsCB(sum); else renderResults(sum);
+    if (cb) renderResultsCB(sum); else if (match) renderResultsMatch(sum); else renderResults(sum);
     renderHistory();
-    if (cb) {
+    if (match) {
+      say('done', (RESULT_WORD[sum.result] || '') + '<small>' + sum.myCards + ' cards</small>', resultLine(sum));
+    } else if (cb) {
       const right = sum.caught + sum.held;
       say('done', `${right}<small>of ${sum.eps.length} right</small>`, sum.avg === null
         ? 'No comebacks caught this round.'
@@ -1213,9 +1480,9 @@ fieldset.settings:disabled { opacity: .5; }
 
   function stop(message) {
     if (!running()) return;
-    clearTimeout(S.timer);
-    clearTimeout(S.flinchTimer);
+    clearRoundTimers();
     S.phase = 'idle';
+    MT.m = null;
     S.pile = []; S.top = null; S.recall = null; S.lastMiss = null; S.stats = null;
     CB.challenge = null; CB.collectBy = null;
     endUi();
@@ -1535,6 +1802,309 @@ fieldset.settings:disabled { opacity: .5; }
     cbContinue(1600);
   }
 
+  /* ---------- Match: you against 1 to 3 bots ---------- */
+  const MT = { m: null, seatEls: [], timers: [], started: 0, endedAt: 0, endsAt: 0, clock: 0, stats: null, lastWin: null, lastMiss: null, lineup: [], reason: '' };
+  const MATCH_MS = 5 * 60 * 1000;
+  const seatPos = (i, n) => (i === 0 ? 'you' : n === 2 ? 'top' : n === 3 ? ['left', 'right'][i - 1] : ['left', 'top', 'right'][i - 1]);
+  const pname = i => (i === 0 ? 'You' : MT.m.players[i].name);
+  const possessive = i => (i === 0 ? 'Your' : `${MT.m.players[i].name}'s`);
+  const takes = i => (i === 0 ? 'You take' : `${pname(i)} takes`);
+  const later = (fn, ms) => { MT.timers.push(setTimeout(fn, ms)); };
+  function clearMatchTimers() { for (const t of MT.timers) clearTimeout(t); MT.timers = []; }
+  const clockText = ms => { const s = Math.ceil(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+
+  function ladderPick() {
+    const open = ladderUnlocked(S.ladder);
+    return open.includes(S.settings.ladderBot) ? S.settings.ladderBot : open[open.length - 1];
+  }
+  function matchLineup() {
+    if (S.settings.matchOpp === 'ladder') return [ladderPick()];
+    const out = [];
+    for (const k of BOT_ORDER) for (let i = 0; i < (S.settings.freeBots[k] || 0); i++) out.push(k);
+    return out.slice(0, 3);
+  }
+
+  function buildMatchSeats() {
+    const box = $('mSeats');
+    box.textContent = '';
+    const n = MT.m.players.length;
+    MT.seatEls = MT.m.players.map((p, i) => {
+      const el = document.createElement('span');
+      el.className = 'seat pos-' + seatPos(i, n);
+      const name = document.createElement('span');
+      name.className = 'seat-name';
+      name.textContent = p.name;
+      const count = document.createElement('span');
+      count.className = 'seat-n';
+      el.append(name, count);
+      box.appendChild(el);
+      return el;
+    });
+  }
+  function renderMatchSeats() {
+    const m = MT.m, top = S.pile[S.pile.length - 1];
+    const fr = felt.getBoundingClientRect(), pr = pileEl.getBoundingClientRect();
+    $('mSeats').style.setProperty('--seat-y', `${Math.round(pr.top - fr.top + pr.height / 2)}px`);
+    m.players.forEach((p, i) => {
+      const el = MT.seatEls[i];
+      el.classList.toggle('on', !!top && top.owner === i);
+      el.classList.toggle('out', p.out);
+      el.lastChild.textContent = p.out ? 'out' : String(p.hand.length);
+    });
+    const ch = m.challenge;
+    chipEl.hidden = !ch;
+    if (ch) {
+      const who = m.turn;
+      const answer = ch.left <= 0 || who < 0 || who === ch.by
+        ? 'out of tries'
+        : `${who === 0 ? 'you have' : `${m.players[who].name} has`} ${ch.left} ${ch.left === 1 ? 'try' : 'tries'}`;
+      chipEl.textContent = `${possessive(ch.by)} ${RANK[ch.rank]}: ${answer}`;
+    }
+  }
+  // Land the card from the seat that played it.
+  function aimTopCard(owner) {
+    const el = pileEl.lastElementChild;
+    if (!el || !el.classList.contains('face')) return;
+    const pos = seatPos(owner, MT.m.players.length);
+    el.style.setProperty('--from', pos === 'you' ? '22px' : pos === 'top' ? '-22px' : '0px');
+    el.style.setProperty('--fromx', pos === 'left' ? '-22px' : pos === 'right' ? '22px' : '0px');
+  }
+  function flashSeat(i) {
+    const el = MT.seatEls[i];
+    if (!el) return;
+    el.classList.remove('burnt');
+    void el.offsetWidth;
+    el.classList.add('burnt');
+  }
+  function sample() { MT.stats.timeline.push([Math.round((performance.now() - MT.started) / 1000), MT.m.players[0].hand.length]); }
+
+  function matchStart() {
+    const lineup = matchLineup();
+    const seen = {};
+    const seats = [{ name: 'You', bot: null }].concat(lineup.map(k => {
+      seen[k] = (seen[k] || 0) + 1;
+      return { name: BOTS[k].name + (lineup.filter(x => x === k).length > 1 ? ' ' + seen[k] : ''), bot: k };
+    }));
+    MT.lineup = lineup;
+    MT.m = newMatch(seats, { burn: S.settings.burn });
+    MT.started = performance.now();
+    MT.endsAt = S.settings.matchLen === 'timed' ? MT.started + MATCH_MS : 0;
+    MT.lastWin = null; MT.lastMiss = null; MT.reason = '';
+    MT.stats = {
+      patterns: 0, won: 0, contested: 0, contestedWon: 0, rts: [], missedToBots: 0, burns: 0, falses: 0,
+      timeline: [], slaps: seats.map(() => 0), faces: seats.map(() => 0), burned: seats.map(() => 0),
+    };
+    sample();
+    S.pile = MT.m.pile;
+    buildMatchSeats();
+    clearInterval(MT.clock);
+    if (MT.endsAt) MT.clock = setInterval(() => { renderHud(); if (S.phase === 'live' && performance.now() >= MT.endsAt) matchEnd('time'); }, 500);
+    const opp = seats.slice(1).map(s => s.name);
+    say('', '', `You against ${opp.join(', ')}. ${opp[0]} plays first.`);
+  }
+
+  // Deal the next card, or hand the pile to whoever has earned it.
+  function mStep() {
+    if (S.phase !== 'gap' && S.phase !== 'live') return;
+    S.phase = 'live';
+    if (MT.endsAt && performance.now() >= MT.endsAt) { matchEnd('time'); return; }
+    const m = MT.m, nx = matchNext(m);
+    if (nx.type === 'collect') { mCollect(nx.by, nx.why); return; }
+    const card = matchPlay(m, nx.by);
+    const n = S.pile.length;
+    const primary = patternsOf(S.pile, S.settings.rules)[0] || null;
+    const pace = Math.round(S.settings.pace * (0.92 + Math.random() * 0.16));
+    const entry = {
+      primary, owner: nx.by, shownAt: 0, resolved: false, pace, plans: [], mine: null, pending: null,
+      view: { t: RANK[card.rank], a: n >= 2 ? RANK[S.pile[n - 2].rank] : '', b: n >= 3 ? RANK[S.pile[n - 3].rank] : '', bottom: RANK[S.pile[0].rank] },
+    };
+    S.top = entry;
+    S.stats.cards++;
+    if (primary) MT.stats.patterns++;
+    MT.lastWin = null;
+    requestAnimationFrame(() => {
+      if (S.top !== entry || S.phase !== 'live') return;
+      renderPile(true);
+      aimTopCard(nx.by);
+      renderSeats();
+      renderHud();
+      entry.shownAt = performance.now();
+      planBots(entry);
+      const bots = m.players.filter(p => p.bot && !p.out);
+      if (bots.length) scheduleFlinch(entry, () => MT.seatEls[pick(bots).id]);
+      S.timer = setTimeout(mTick, pace);
+    });
+  }
+
+  // Each bot draws its reaction to this card from its profile.
+  function planBots(entry) {
+    for (const p of MT.m.players) {
+      if (!p.bot || p.out) continue;
+      const rt = botReaction(p.bot, { valid: !!entry.primary, ownCard: entry.owner === p.id, hasCards: p.hand.length > 0 });
+      if (rt === null || rt >= entry.pace) continue; // too slow: the next card covers it first
+      const ms = Math.round(rt);
+      entry.plans.push({ who: p.id, rt: ms });
+      later(() => botSlap(entry, p.id, ms), ms);
+    }
+  }
+
+  function botSlap(entry, i, rt) {
+    if (S.top !== entry || S.phase !== 'live') return;
+    const m = MT.m, p = m.players[i];
+    if (p.out) return;
+    if (entry.primary) {
+      if (entry.resolved || entry.pending) return;
+      // Give a slap of yours that is already on its way a moment to arrive before the bot takes it.
+      entry.pending = { who: i, rt };
+      later(() => awardBot(entry), 40);
+      return;
+    }
+    const r = matchBurn(m, i);
+    MT.stats.burned[i] += r.burned;
+    flashSeat(i);
+    renderSeats();
+    if (r.out) { say('', '', `${p.name} slapped with no cards and is out.`); checkOver(); }
+  }
+  function awardBot(entry) {
+    if (S.top !== entry || entry.resolved || S.phase !== 'live') return;
+    mWin(entry.pending.who, entry.pending.rt, entry);
+  }
+
+  function mSlap(t) {
+    const m = MT.m, me = m.players[0];
+    if (me.out) return;
+    const lw = MT.lastWin;
+    if (S.phase === 'gap' && lw && !lw.answered && t - lw.at < 700) {
+      // You went for it too, but a bot got there first.
+      lw.answered = true;
+      const rt = Math.max(0, Math.round(t - lw.entry.shownAt));
+      MT.stats.contested++; MT.stats.missedToBots--; MT.stats.rts.push(rt);
+      Object.assign(lw.mistake, { kind: 'late', ms: rt });
+      say('late', `${lw.name} ${lw.rt}<small>ms</small>`, `${RULE_NAME[lw.entry.primary]}: ${patternText(lw.entry)}. You were at ${rt} ms. ${lw.name} takes ${lw.count} cards.`);
+      return;
+    }
+    if (S.phase !== 'live') return;
+    const e = S.top;
+    if (!e) return;
+    if (e.primary && !e.resolved && e.shownAt && t >= e.shownAt) {
+      const rt = Math.round(t - e.shownAt);
+      if (e.pending && e.pending.rt <= rt) { e.mine = rt; return; } // the bot was faster; it gets the pile in a moment
+      mWin(0, rt, e);
+      return;
+    }
+    if (e.primary && e.resolved) return;
+    // Nothing to slap: burn.
+    const r = matchBurn(m, 0);
+    MT.stats.falses++; S.stats.falses++;
+    MT.stats.burns += r.burned; MT.stats.burned[0] += r.burned;
+    const f = falseKind(S.pile, S.settings.rules);
+    const bait = tookBait(t, S.flinchAt);
+    if (bait) S.stats.baited++;
+    const lm = MT.lastMiss;
+    if (lm && !lm.converted && t - lm.coveredAt < LATE_WINDOW && !r.out) {
+      lm.converted = true;
+      const by = Math.max(1, Math.round(t - lm.coveredAt));
+      Object.assign(lm.mistake, { kind: 'late', late: by, ms: Math.round(t - lm.entry.shownAt), burned: r.burned });
+      say('late', `+${by}<small>ms late</small>`, `${RULE_NAME[lm.entry.primary]}: ${patternText(lm.entry)} was already covered. You burn ${r.burned}.`);
+    } else {
+      noteMistake({
+        kind: 'false', fk: f, cards: pileTail(S.pile), ms: e.shownAt ? Math.max(0, Math.round(t - e.shownAt)) : 0, pace: e.pace,
+        bait, gap: bait ? Math.round(t - S.flinchAt) : null, flinch: typeof e.flinch === 'number' ? e.flinch : bait ? 0 : null, burned: r.burned,
+      });
+      if (r.out) say('false', 'Out', 'False slap with no cards left. You are out of the game.');
+      else say('false', bait ? 'Bait' : 'Burn', `${bait ? 'Took the bait. ' : 'False slap. '}${falseText(f)} You burn ${r.burned}.`);
+    }
+    sample();
+    renderSeats();
+    renderHud();
+    if (r.out) matchEnd('out');
+  }
+
+  // Someone slapped the pattern first and takes the pile.
+  function mWin(w, rt, e) {
+    clearMatchTimers();
+    clearTimeout(S.timer);
+    clearTimeout(S.flinchTimer);
+    e.resolved = true;
+    const m = MT.m, count = m.pile.length + m.burn.length;
+    const rivals = e.plans.filter(p => p.who !== w).sort((a, b) => a.rt - b.rt);
+    MT.stats.slaps[w]++;
+    if (w === 0) {
+      MT.stats.won++; MT.stats.rts.push(rt);
+      if (rivals.length) { MT.stats.contested++; MT.stats.contestedWon++; }
+      say('hit', `${rt}<small>ms</small>`, `${RULE_NAME[e.primary]}: ${patternText(e)}. You take ${count} cards.` + (rivals.length ? ` ${pname(rivals[0].who)} went at ${rivals[0].rt} ms.` : ''));
+    } else {
+      const name = pname(w);
+      const mistake = noteMistake({ kind: 'missed', rule: e.primary, call: patternText(e), cards: pileTail(S.pile), pace: e.pace, who: name, whoMs: rt });
+      if (e.mine !== null) {
+        MT.stats.contested++; MT.stats.rts.push(e.mine);
+        Object.assign(mistake, { kind: 'late', ms: e.mine });
+        say('late', `${name} ${rt}<small>ms</small>`, `${RULE_NAME[e.primary]}: ${patternText(e)}. You were at ${e.mine} ms. ${name} takes ${count} cards.`);
+      } else {
+        MT.stats.missedToBots++;
+        MT.lastWin = { at: performance.now(), entry: e, rt, name, count, mistake, answered: false };
+        say('miss', `${name} ${rt}<small>ms</small>`, `${RULE_NAME[e.primary]}: ${patternText(e)}. ${name} takes ${count} cards.`);
+      }
+    }
+    afterCollect(matchCollect(m, w), 1000);
+  }
+
+  // The window closed and nobody took the pattern.
+  function mTick() {
+    if (S.phase !== 'live') return;
+    const e = S.top;
+    if (e && e.pending && !e.resolved) { awardBot(e); return; }
+    clearMatchTimers();
+    if (e && e.primary && !e.resolved) {
+      e.resolved = true;
+      const mistake = noteMistake({ kind: 'missed', rule: e.primary, call: patternText(e), cards: pileTail(S.pile), pace: e.pace });
+      MT.lastMiss = { entry: e, coveredAt: performance.now(), converted: false, mistake };
+      say('miss', 'Missed', `${RULE_NAME[e.primary]}: ${patternText(e)}. Nobody slapped it.`);
+    }
+    mStep();
+  }
+
+  function mCollect(w, why) {
+    clearMatchTimers();
+    const m = MT.m, ch = m.challenge, count = m.pile.length + m.burn.length;
+    if (why === 'face' && ch) {
+      MT.stats.faces[w]++;
+      say('', '', `${possessive(w)} ${RANK[ch.rank]} went unanswered. ${takes(w)} ${count} cards.`);
+    } else say('', '', `Nobody has a card left to play. ${takes(w)} the pile.`);
+    afterCollect(matchCollect(m, w), 900);
+  }
+
+  function afterCollect(res, delay) {
+    S.pile = MT.m.pile;
+    S.top = null;
+    MT.lastMiss = null;
+    sample();
+    renderPile(false);
+    renderSeats();
+    renderHud();
+    if (res.knocked.length) {
+      const names = res.knocked.filter(i => i !== 0).map(pname);
+      const note = res.knocked.includes(0) ? 'You have no cards left, so you are out.' : `${names.join(' and ')} ${names.length === 1 ? 'is' : 'are'} out.`;
+      readoutSub.textContent = `${readoutSub.textContent} ${note}`.trim();
+    }
+    if (res.knocked.includes(0)) { matchEnd('out'); return; }
+    if (checkOver()) return;
+    S.phase = 'gap';
+    S.timer = setTimeout(mStep, delay);
+  }
+  function checkOver() {
+    if (!matchOver(MT.m)) return false;
+    matchEnd('over');
+    return true;
+  }
+  function matchEnd(reason) {
+    if (S.phase === 'ending' || S.phase === 'done') return;
+    MT.reason = reason;
+    MT.endedAt = performance.now();
+    sample();
+    finishSoon(1300);
+  }
+
   /* ---------- Results ---------- */
   function summarize() {
     const st = S.stats, set = S.settings;
@@ -1614,6 +2184,7 @@ fieldset.settings:disabled { opacity: .5; }
     $('resultsMeta').textContent = `${DECK_NAME[sum.deck] || 'Drill mix'} · ${ruleNames} · pace ${pace}`;
     $('rFocus').textContent = sum.focus ? `Focus: ${sum.focus}` : '';
     $('rFocus').hidden = !sum.focus;
+    renderChart(null);
 
     $('tAvgL').textContent = 'Average reaction';
     $('rAvg').innerHTML = sum.avg === null ? '–' : `${sum.avg}<small>ms</small>`;
@@ -1701,6 +2272,7 @@ fieldset.settings:disabled { opacity: .5; }
   function renderResultsCB(sum) {
     $('results').hidden = false;
     $('rFocus').hidden = true;
+    renderChart(null);
     $('resultsMeta').textContent = `Comebacks · ${sum.eps.length} piles · pace ${sum.pace} ms · ${sum.falses} false slap${sum.falses === 1 ? '' : 's'}`;
 
     $('tAvgL').textContent = 'Comeback reaction';
@@ -1748,6 +2320,208 @@ fieldset.settings:disabled { opacity: .5; }
     }
     fillCoach(coachCB(sum));
     renderMistakes(sum.mistakes, sum.mistakeCount);
+  }
+
+  /* ---------- Match results ---------- */
+  const RESULT_WORD = { won: 'Won', lost: 'Lost', draw: 'Draw' };
+  function summarizeMatch() {
+    const m = MT.m, st = MT.stats;
+    const dur = Math.round(((MT.endedAt || performance.now()) - MT.started) / 1000);
+    return {
+      mode: 'match', at: Date.now(), result: matchResult(m, MT.reason), reason: MT.reason,
+      opp: m.players.slice(1).map(p => p.name).join(', '), length: S.settings.matchLen, burn: S.settings.burn, pace: S.settings.pace, dur,
+      myCards: m.players[0].hand.length, patterns: st.patterns, won: st.won, contested: st.contested, contestedWon: st.contestedWon,
+      avg: st.rts.length ? Math.round(mean(st.rts)) : null, missedToBots: st.missedToBots, burns: st.burns, falses: st.falses,
+      baited: S.stats.baited, flinches: S.stats.flinches,
+      acc: st.patterns ? Math.round(100 * st.won / st.patterns) : 0,
+      standings: m.players.map((p, i) => ({ name: p.name, cards: p.hand.length, out: p.out, slaps: st.slaps[i], faces: st.faces[i], burned: st.burned[i] })),
+      timeline: st.timeline.slice(), unlocked: null,
+      mistakes: S.mistakes.slice(), mistakeCount: S.mistakeCount,
+    };
+  }
+  function resultLine(sum) {
+    const time = clockText(sum.dur * 1000);
+    const rivals = sum.standings.slice(1).sort((a, b) => b.cards - a.cards);
+    if (sum.reason === 'time') {
+      if (sum.result === 'won') return `Most cards when time ran out. ${rivals[0].name} had ${rivals[0].cards}.`;
+      if (sum.result === 'draw') return 'Tied for the most cards when time ran out.';
+      return `${rivals[0].name} had the most cards: ${rivals[0].cards}.`;
+    }
+    if (sum.result === 'won') return `Last player with cards, after ${time}.`;
+    if (sum.reason === 'out') return `Knocked out after ${time}.`;
+    return `${rivals[0].name} took every card, after ${time}.`;
+  }
+  function coachMatch(sum) {
+    const tips = [];
+    if (sum.unlocked) tips.push(['good', `You beat ${sum.opp} one-on-one. ${sum.unlocked} is now open on the ladder.`]);
+    if (sum.missedToBots >= 2) tips.push(['miss', `${sum.missedToBots} patterns went to a bot while you never moved. They're in the mistakes below, so replay them.`]);
+    const lost = sum.contested - sum.contestedWon;
+    if (lost >= 2) tips.push(['late', `You lost ${lost} of ${sum.contested} races to a bot. Go the moment the ranks match; checking twice is where those milliseconds go.`]);
+    if (sum.baited >= 2) tips.push(['false', `You took the bait ${sum.baited} times. A hand moving means nothing until the card says so.`]);
+    else if (sum.burns >= 4) tips.push(['false', `You burned ${sum.burns} cards. Every burn goes to whoever wins the next pile.`]);
+    if (!tips.length) tips.push(['good', sum.result === 'won' ? 'Clean game. Try the next bot up, or add a seat in free play.' : 'Close. Run it back at the same pace.']);
+    return tips.slice(0, 3);
+  }
+  function renderResultsMatch(sum) {
+    $('results').hidden = false;
+    $('rFocus').hidden = true;
+    $('resultsMeta').textContent = `Match vs ${sum.opp} · ${sum.length === 'timed' ? '5 minutes' : 'full game'} · pace ${sum.pace} ms · burn ${sum.burn}`;
+
+    $('tAvgL').textContent = 'Result';
+    $('rAvg').textContent = RESULT_WORD[sum.result] || '–';
+    $('rAvgSub').textContent = `${sum.myCards} card${sum.myCards === 1 ? '' : 's'} in hand. ${resultLine(sum)}`;
+    level($('tileAvg'), sum.result === 'won' ? 'good' : sum.result === 'draw' ? 'mid' : 'low');
+
+    $('tAccL').textContent = 'Races won';
+    $('rAcc').innerHTML = sum.contested ? `${sum.contestedWon}<small>of ${sum.contested}</small>` : '–';
+    $('rAccSub').textContent = `Slaps you won when a bot also went. ${sum.won} of ${sum.patterns} patterns were yours.`;
+    const rr = sum.contested ? sum.contestedWon / sum.contested : null;
+    level($('tileAcc'), rr === null ? '' : rr >= 0.6 ? 'good' : rr >= 0.35 ? 'mid' : 'low');
+
+    $('tFalseL').textContent = 'Average reaction';
+    $('rFalse').innerHTML = sum.avg === null ? '–' : `${sum.avg}<small>ms</small>`;
+    $('rFalseSub').textContent = sum.missedToBots ? `${sum.missedToBots} pattern${sum.missedToBots === 1 ? '' : 's'} a bot took that you missed` : 'No pattern went to a bot without a slap from you';
+    level($('tileFalse'), sum.avg === null ? 'low' : sum.avg < 400 ? 'good' : sum.avg < 520 ? 'mid' : 'low');
+
+    $('tMemL').textContent = 'Your burns';
+    $('rMem').innerHTML = `${sum.burns}<small>card${sum.burns === 1 ? '' : 's'}</small>`;
+    $('rMemSub').textContent = sum.falses ? `${sum.falses} false slap${sum.falses === 1 ? '' : 's'}` + (sum.baited ? ` · ${sum.baited} took the bait` : '') : 'No false slaps';
+    level($('tileMem'), sum.burns <= 1 ? 'good' : sum.burns <= 4 ? 'mid' : 'low');
+
+    $('rHead').innerHTML = '<tr><th scope="col">Player</th><th scope="col">Cards</th><th scope="col">Slaps</th><th scope="col">Faces</th><th scope="col">Burned</th></tr>';
+    const body = $('rRows');
+    body.textContent = '';
+    for (const p of sum.standings) {
+      const tr = document.createElement('tr');
+      const cells = [['th', p.name], ['td', p.out ? 'out' : String(p.cards)], ['td', String(p.slaps)], ['td', String(p.faces)], ['td', String(p.burned)]];
+      for (const [tag, text] of cells) {
+        const cell = document.createElement(tag);
+        if (tag === 'th') cell.scope = 'row';
+        cell.textContent = text;
+        tr.appendChild(cell);
+      }
+      body.appendChild(tr);
+    }
+    renderChart(sum.timeline);
+    fillCoach(coachMatch(sum));
+    renderMistakes(sum.mistakes, sum.mistakeCount);
+  }
+
+  // Your card count over the game: one line, stepped, since the count only changes when a pile is won or cards burn.
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  function svgEl(tag, attrs, text) {
+    const el = document.createElementNS(SVG_NS, tag);
+    for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, String(v));
+    if (text !== undefined) el.textContent = text;
+    return el;
+  }
+  function renderChart(pts) {
+    const box = $('rChart'), read = $('chartRead');
+    const old = box.querySelector('svg');
+    if (old) old.remove();
+    pts = Array.isArray(pts) ? pts.filter(p => Array.isArray(p) && p.length === 2) : [];
+    box.hidden = pts.length < 2;
+    if (box.hidden) return;
+    const W = 320, H = 128, L = 26, R = 30, T = 10, B = 20;
+    const tMax = Math.max(1, pts[pts.length - 1][0]);
+    const yMax = Math.min(52, Math.max(13, Math.ceil(Math.max(...pts.map(p => p[1])) / 13) * 13));
+    const x = t => L + (W - L - R) * t / tMax, y = n => T + (H - T - B) * (1 - n / yMax);
+    const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img' });
+    const first = pts[0][1], last = pts[pts.length - 1][1], peak = Math.max(...pts.map(p => p[1]));
+    svg.setAttribute('aria-label', `Your cards over ${clockText(tMax * 1000)}: started at ${first}, peaked at ${peak}, ended at ${last}.`);
+    for (const v of [0, yMax / 2, yMax]) {
+      svg.appendChild(svgEl('line', { class: 'grid', x1: L, x2: W - R, y1: y(v), y2: y(v) }));
+      svg.appendChild(svgEl('text', { class: 'tick', x: L - 6, y: y(v) + 3, 'text-anchor': 'end' }, String(Math.round(v))));
+    }
+    svg.appendChild(svgEl('line', { class: 'even', x1: L, x2: W - R, y1: y(first), y2: y(first) }));
+    let d = `M${x(pts[0][0]).toFixed(1)} ${y(pts[0][1]).toFixed(1)}`;
+    for (let i = 1; i < pts.length; i++) d += ` H${x(pts[i][0]).toFixed(1)} V${y(pts[i][1]).toFixed(1)}`;
+    svg.appendChild(svgEl('path', { class: 'line', d }));
+    svg.appendChild(svgEl('text', { class: 'tick', x: L, y: H - 4 }, '0:00'));
+    svg.appendChild(svgEl('text', { class: 'tick', x: W - R, y: H - 4, 'text-anchor': 'end' }, clockText(tMax * 1000)));
+    svg.appendChild(svgEl('text', { class: 'end', x: x(tMax) + 5, y: y(last) + 4 }, String(last)));
+    const hair = svgEl('line', { class: 'xhair', y1: T, y2: H - B, visibility: 'hidden' });
+    const dot = svgEl('circle', { class: 'dot', r: 4, visibility: 'hidden' });
+    svg.append(hair, dot);
+    const idle = `Started with ${first}, ended with ${last}.`;
+    read.textContent = idle;
+    const show = ev => {
+      const r = svg.getBoundingClientRect();
+      const t = ((ev.clientX - r.left) / r.width * W - L) / (W - L - R) * tMax;
+      let p = pts[0];
+      for (const q of pts) if (q[0] <= t) p = q;
+      hair.setAttribute('x1', x(Math.max(0, Math.min(tMax, t))));
+      hair.setAttribute('x2', x(Math.max(0, Math.min(tMax, t))));
+      dot.setAttribute('cx', x(Math.max(0, Math.min(tMax, t))));
+      dot.setAttribute('cy', y(p[1]));
+      hair.setAttribute('visibility', 'visible');
+      dot.setAttribute('visibility', 'visible');
+      read.textContent = `${clockText(Math.max(0, Math.min(tMax, t)) * 1000)} · ${p[1]} cards`;
+    };
+    const hide = () => { hair.setAttribute('visibility', 'hidden'); dot.setAttribute('visibility', 'hidden'); read.textContent = idle; };
+    svg.addEventListener('pointermove', show);
+    svg.addEventListener('pointerdown', show);
+    svg.addEventListener('pointerleave', hide);
+    box.appendChild(svg);
+  }
+
+  /* ---------- Match settings: ladder and free play ---------- */
+  function buildMatchSettings() {
+    buildSeg('oppSeg', OPPS.map(o => ({ v: o.v, html: o.name })), 'matchOpp');
+    buildSeg('mlenSeg', MATCH_LENGTHS.map(o => ({ v: o.v, html: o.name })), 'matchLen');
+    buildSeg('burnSeg', BURNS.map(n => ({ v: n, html: `${n} card${n === 1 ? '' : 's'}` })), 'burn');
+    const lad = $('ladderBots'), free = $('freeBots');
+    for (const k of BOT_ORDER) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'rule';
+      b.dataset.bot = k;
+      b.innerHTML = `<span class="rule-top"><span class="rule-name">${BOTS[k].name}</span><span class="rule-eg"></span></span><span class="rule-desc"></span>`;
+      b.addEventListener('click', () => { if (!ladderUnlocked(S.ladder).includes(k)) return; S.settings.ladderBot = k; saveSettings(); syncSettings(); });
+      lad.appendChild(b);
+      const row = document.createElement('div');
+      row.className = 'free-row';
+      row.dataset.bot = k;
+      row.innerHTML = `<span class="free-name"><b>${BOTS[k].name}</b><span>${BOTS[k].desc}</span></span><span class="stepper"><button type="button" class="step" data-d="-1" aria-label="One fewer ${BOTS[k].name}">−</button><span class="count" aria-live="polite"></span><button type="button" class="step" data-d="1" aria-label="One more ${BOTS[k].name}">+</button></span>`;
+      for (const s of row.querySelectorAll('.step')) {
+        s.addEventListener('click', () => {
+          const fb = Object.assign({}, S.settings.freeBots), dir = Number(s.dataset.d);
+          const total = BOT_ORDER.reduce((a, x) => a + fb[x], 0);
+          if (dir > 0 && total >= 3) return;
+          if (dir < 0 && (fb[k] === 0 || total <= 1)) return;
+          fb[k] += dir;
+          S.settings.freeBots = fb;
+          saveSettings();
+          syncSettings();
+        });
+      }
+      free.appendChild(row);
+    }
+  }
+  function syncMatchSettings() {
+    const set = S.settings, open = ladderUnlocked(S.ladder), chosen = ladderPick(), ladder = set.matchOpp === 'ladder';
+    $('ladderBots').hidden = !ladder;
+    $('freeBots').hidden = ladder;
+    for (const b of $('ladderBots').children) {
+      const k = b.dataset.bot, isOpen = open.includes(k), prev = BOT_ORDER[BOT_ORDER.indexOf(k) - 1];
+      b.disabled = !isOpen;
+      b.setAttribute('aria-pressed', String(k === chosen));
+      b.querySelector('.rule-eg').textContent = !isOpen ? 'Locked' : S.ladder.beaten[k] ? 'Beaten' : `${BOTS[k].rt} ms`;
+      b.querySelector('.rule-desc').textContent = isOpen ? BOTS[k].desc : `Beat ${BOTS[prev].name} one-on-one to unlock.`;
+    }
+    const total = BOT_ORDER.reduce((a, k) => a + set.freeBots[k], 0);
+    for (const row of $('freeBots').children) {
+      const k = row.dataset.bot, n = set.freeBots[k];
+      const [minus, plus] = row.querySelectorAll('.step');
+      row.classList.toggle('on', n > 0);
+      row.querySelector('.count').textContent = String(n);
+      minus.disabled = n === 0 || total <= 1;
+      plus.disabled = total >= 3;
+    }
+    const next = BOT_ORDER.find(k => !open.includes(k));
+    $('oppNote').textContent = !ladder
+      ? `You plus ${total} bot${total === 1 ? '' : 's'}, 52 cards dealt evenly. Pick 1 to 3; any bot, locked or not.`
+      : next ? `One-on-one. Beat ${BOTS[BOT_ORDER[BOT_ORDER.indexOf(next) - 1]].name} to unlock ${BOTS[next].name}.` : 'Every bot is unlocked.';
   }
 
   /* ---------- Fake flinches ---------- */
@@ -1882,7 +2656,7 @@ fieldset.settings:disabled { opacity: .5; }
     catch (err) { fmt = { format: d => d.toLocaleString() }; }
     for (const h of S.history.slice(0, 8)) {
       const li = document.createElement('li');
-      const when = fmt.format(new Date(h.at)) + (h.mode === 'comeback' ? ' · Comebacks' : '');
+      const when = fmt.format(new Date(h.at)) + (h.mode === 'comeback' ? ' · Comebacks' : h.mode === 'match' ? ' · Match' + (h.result ? ', ' + h.result : '') : '');
       const cells = [['h-when', when], ['', `${num(h.acc) || 0}%`], ['', num(h.avg) === null ? '–' : `${num(h.avg)} ms`], ['h-false', String(num(h.falses) || 0)], ['h-pace', `${num(h.pace) || 0} ms`]];
       for (const [cls, text] of cells) {
         const span = document.createElement('span');
@@ -1892,7 +2666,7 @@ fieldset.settings:disabled { opacity: .5; }
       }
       list.appendChild(li);
     }
-    const clean = S.history.filter(h => h.mode !== 'comeback' && h.acc >= 80 && num(h.avg) !== null);
+    const clean = S.history.filter(h => h.mode === 'live' && h.acc >= 80 && num(h.avg) !== null);
     $('bestNote').textContent = clean.length
       ? `Best live average in a round with 80% or more caught: ${Math.min(...clean.map(h => h.avg))} ms.`
       : 'Catch 80% or more in a live round to set a best average.';
@@ -1943,13 +2717,14 @@ fieldset.settings:disabled { opacity: .5; }
     buildSeg('flinchSeg', FLINCHES.map(f => ({ v: f.v, html: f.name })), 'flinch');
     buildSeg('lenSeg', LENGTHS.map(n => ({ v: n, html: `${n}<small>patterns</small>` })), 'length');
     buildSeg('pilesSeg', PILE_COUNTS.map(n => ({ v: n, html: `${n}<small>piles</small>` })), 'piles');
+    buildMatchSettings();
     for (const [id, key] of [['adaptive', 'adaptive'], ['memory', 'memory'], ['assistBox', 'assist'], ['focus', 'focus']]) {
       $(id).addEventListener('change', ev => { S.settings[key] = ev.target.checked; saveSettings(); syncSettings(); });
     }
   }
   function syncSettings() {
     for (const b of $('rules').children) b.setAttribute('aria-pressed', String(!!S.settings.rules[b.dataset.rule]));
-    for (const [id, key] of [['modeSeg', 'mode'], ['paceSeg', 'pace'], ['deckSeg', 'deck'], ['lenSeg', 'length'], ['pilesSeg', 'piles'], ['flinchSeg', 'flinch']]) {
+    for (const [id, key] of [['modeSeg', 'mode'], ['paceSeg', 'pace'], ['deckSeg', 'deck'], ['lenSeg', 'length'], ['pilesSeg', 'piles'], ['flinchSeg', 'flinch'], ['oppSeg', 'matchOpp'], ['mlenSeg', 'matchLen'], ['burnSeg', 'burn']]) {
       for (const b of $(id).children) b.setAttribute('aria-pressed', String(b.dataset.v === String(S.settings[key])));
     }
     $('adaptive').checked = S.settings.adaptive;
@@ -1959,7 +2734,8 @@ fieldset.settings:disabled { opacity: .5; }
     $('focus').disabled = S.settings.deck !== 'drill';
     $('deckNote').textContent = (DECKS.find(d => d.v === S.settings.deck) || DECKS[0]).note;
     $('modeNote').textContent = (MODES.find(m => m.v === S.settings.mode) || MODES[0]).note;
-    for (const el of document.querySelectorAll('[data-only]')) el.hidden = el.dataset.only !== S.settings.mode;
+    for (const el of document.querySelectorAll('[data-only]')) el.hidden = !el.dataset.only.split(' ').includes(S.settings.mode);
+    syncMatchSettings();
     renderHud();
   }
   function buildRanks() {
@@ -2038,6 +2814,7 @@ fieldset.settings:disabled { opacity: .5; }
     if (last && typeof last === 'object') {
       try {
         if (last.mode === 'comeback' && Array.isArray(last.eps)) { S.lastSummary = last; renderResultsCB(last); }
+        else if (last.mode === 'match' && Array.isArray(last.standings)) { S.lastSummary = last; renderResultsMatch(last); }
         else if (Array.isArray(last.rows)) { S.lastSummary = last; renderResults(last); }
       } catch (err) { $('results').hidden = true; }
     }
@@ -2045,7 +2822,9 @@ fieldset.settings:disabled { opacity: .5; }
     if (hot && typeof hot.snapshot === 'function') hot.snapshot(() => ({ settings: S.settings, last: S.lastSummary }));
   }
 
-  window.ewt = { patternsOf, targetCard, lureCard, neutralCard, drillCard, falseKind, isRun, makeWinScript, S, CB, RP, flinch };
+  window.addEventListener('resize', () => { if (matchMode() && running()) renderSeats(); });
+
+  window.ewt = { patternsOf, targetCard, lureCard, neutralCard, drillCard, falseKind, isRun, makeWinScript, S, CB, RP, MT, flinch };
   const hot = window.claude && window.claude.hot;
   if (hot && typeof hot.ready === 'function') hot.ready(boot);
   else boot((hot && hot.data) || {});
