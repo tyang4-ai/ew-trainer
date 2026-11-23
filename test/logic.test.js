@@ -132,5 +132,89 @@ test('mistakeTiming states your timing', () => {
   assert.strictEqual(E.mistakeTiming({ kind: 'late', who: 'Shark', whoMs: 296, ms: 340 }), 'Shark 296 ms, you 340 ms');
 });
 
+/* ---------- Targeted practice ---------- */
+const rts = (n, ms) => Array.from({ length: n }, () => ms);
+function roundStats(by, falseKinds) {
+  const out = { by: {}, falseKinds: falseKinds || {} };
+  for (const k of E.RULES) out.by[k] = Object.assign({ seen: 0, hit: 0, late: 0, miss: 0, rts: [] }, by[k] || {});
+  return out;
+}
+// Doubles fast and clean, sandwiches slow, top-bottoms missed a lot.
+const WEAK = E.addRoundToWeak(null, roundStats({
+  double: { hit: 20, rts: rts(20, 380) },
+  sandwich: { hit: 18, late: 1, miss: 1, rts: rts(18, 560) },
+  topbottom: { hit: 4, miss: 6, rts: rts(4, 470) },
+}, { oneoff: 5, face: 2, suit: 1, other: 4 }));
+test('addRoundToWeak accumulates across rounds and maps false-slap kinds', () => {
+  const w2 = E.addRoundToWeak(WEAK, roundStats({ double: { hit: 2, miss: 1, rts: [400, 420] } }, { sum: 2 }));
+  assert.deepStrictEqual(w2.rules.double, { caught: 22, late: 0, missed: 1, rtSum: 20 * 380 + 820, rtN: 22 });
+  assert.deepStrictEqual(w2.falses, { oneoff: 5, lookalike: 2, neartens: 2, suit: 1 });
+  assert.deepStrictEqual(E.cleanWeak('junk').falses, { oneoff: 0, lookalike: 0, neartens: 0, suit: 0 });
+  assert.strictEqual(E.cleanWeak({ rules: { double: { caught: -4, rtSum: 'x' } } }).rules.double.caught, 0);
+});
+test('ruleShares sum to 1, keep every enabled rule, and favour the weakest', () => {
+  const sh = E.ruleShares(WEAK, DEFAULT_RULES);
+  assert.deepStrictEqual(Object.keys(sh).sort(), ['double', 'sandwich', 'topbottom']);
+  assert.ok(Math.abs(Object.values(sh).reduce((a, b) => a + b, 0) - 1) < 1e-9);
+  for (const v of Object.values(sh)) assert.ok(v >= 0.5 / 3 - 1e-9, 'floor keeps every rule in the mix');
+  assert.ok(sh.double < sh.sandwich && sh.double < sh.topbottom, JSON.stringify(sh));
+  const even = E.ruleShares(null, DEFAULT_RULES);
+  for (const v of Object.values(even)) assert.ok(Math.abs(v - 1 / 3) < 1e-9, 'no data means an even mix');
+  assert.deepStrictEqual(E.ruleShares(WEAK, { double: true }), { double: 1 });
+});
+test('lureShares favour the near-miss you fall for and skip near-tens without the tens rule', () => {
+  const ls = E.lureShares(WEAK, DEFAULT_RULES);
+  assert.deepStrictEqual(Object.keys(ls), ['oneoff', 'lookalike', 'suit']);
+  assert.ok(ls.oneoff > ls.lookalike && ls.lookalike > ls.suit);
+  assert.ok('neartens' in E.lureShares(WEAK, ALL_RULES));
+});
+test('focusPlan says what the round leans toward', () => {
+  const slow = E.addRoundToWeak(null, roundStats({ double: { hit: 10, rts: rts(10, 380) }, sandwich: { hit: 10, rts: rts(10, 600) } }));
+  const plan = E.focusPlan(slow, { double: true, sandwich: true });
+  assert.strictEqual(E.focusText(plan), 'Extra sandwiches: your slowest rule.');
+  const missy = E.addRoundToWeak(null, roundStats({ double: { hit: 10, rts: rts(10, 420) }, sandwich: { hit: 3, miss: 7, rts: rts(3, 400) } }, { oneoff: 4, suit: 1 }));
+  assert.strictEqual(E.focusText(E.focusPlan(missy, { double: true, sandwich: true })), 'Extra sandwiches: the one you miss most. More one-off near-misses: the near-miss you slap most.');
+  assert.strictEqual(E.focusText(E.focusPlan(null, DEFAULT_RULES)), 'No weak spot stands out yet, so the mix stayed even.');
+});
+test('targetCardFor completes the rule asked for; lureCardOf makes the near-miss asked for', () => {
+  let made = 0, lures = 0;
+  for (let i = 0; i < 3000; i++) {
+    const pile = randomPile(E.randInt(1, 10));
+    for (const rule of E.RULES) {
+      const c = E.targetCardFor(pile, ALL_RULES, rule);
+      if (c) { made++; assert.ok(E.patternsOf(pile.concat([c]), ALL_RULES).includes(rule), rule); }
+    }
+    for (const type of E.LURE_TYPES) {
+      const c = E.lureCardOf(pile, ALL_RULES, type);
+      if (!c) continue;
+      lures++;
+      assert.ok(!E.completes(pile, c, ALL_RULES), 'lure never completes');
+      const kind = E.falseKind(pile.concat([c]), ALL_RULES).kind;
+      assert.strictEqual({ oneoff: 'oneoff', lookalike: 'lookalike', face: 'lookalike', sum: 'neartens', suit: 'suit' }[kind], type);
+    }
+  }
+  assert.ok(made > 3000 && lures > 3000, `${made} targets, ${lures} lures`);
+});
+test('drillCard with a focus plan leans toward the weak rule and keeps the same pattern rate', () => {
+  function run(plan) {
+    const counts = {}; let patterns = 0, cards = 0;
+    let pile = [];
+    for (let i = 0; i < 30000; i++) {
+      const c = E.drillCard(pile, DEFAULT_RULES, plan);
+      pile.push(c); cards++;
+      const p = E.patternsOf(pile, DEFAULT_RULES)[0];
+      if (p) { patterns++; counts[p] = (counts[p] || 0) + 1; pile = []; }
+      else if (pile.length > 12) pile = [];
+    }
+    return { counts, rate: patterns / cards };
+  }
+  const slowSandwich = E.addRoundToWeak(null, roundStats({ double: { hit: 30, rts: rts(30, 360) }, sandwich: { hit: 30, rts: rts(30, 660) }, topbottom: { hit: 30, rts: rts(30, 380) } }));
+  const plain = run(null), focus = run(E.focusPlan(slowSandwich, DEFAULT_RULES));
+  const share = r => r.counts.sandwich / (r.counts.double + r.counts.sandwich + r.counts.topbottom);
+  assert.ok(share(focus) > share(plain) + 0.08, `sandwich share ${share(plain).toFixed(2)} -> ${share(focus).toFixed(2)}`);
+  for (const k of ['double', 'topbottom']) assert.ok(focus.counts[k] > 300, `${k} still dealt (${focus.counts[k]})`);
+  assert.ok(Math.abs(focus.rate - plain.rate) < 0.05, `pattern rate ${plain.rate.toFixed(3)} vs ${focus.rate.toFixed(3)}`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exitCode = failed ? 1 : 0;

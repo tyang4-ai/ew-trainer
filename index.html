@@ -197,6 +197,7 @@ fieldset.settings:disabled { opacity: .5; }
 .check { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; font-size: .9rem; line-height: 1.4; cursor: pointer; }
 .check input { width: 18px; height: 18px; margin: 1px 0 0; accent-color: var(--stock); cursor: pointer; }
 .check b { color: var(--stock); font-weight: 700; }
+.check:has(input:disabled) { opacity: .5; cursor: default; }
 
 /* Results */
 .tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
@@ -318,6 +319,7 @@ fieldset.settings:disabled { opacity: .5; }
     <section class="panel results" id="results" hidden aria-labelledby="resultsTitle">
       <h2 id="resultsTitle">Last round</h2>
       <p class="meta" id="resultsMeta"></p>
+      <p class="note" id="rFocus" hidden></p>
       <div class="tiles">
         <div class="tile" id="tileAvg"><div class="tile-num" id="rAvg">–</div><div class="tile-label" id="tAvgL">Average reaction</div><div class="tile-sub" id="rAvgSub"></div></div>
         <div class="tile" id="tileAcc"><div class="tile-num" id="rAcc">–</div><div class="tile-label" id="tAccL">Patterns caught</div><div class="tile-sub" id="rAccSub"></div></div>
@@ -362,6 +364,7 @@ fieldset.settings:disabled { opacity: .5; }
           <span class="label" id="deckLabel">Deck</span>
           <div class="seg" id="deckSeg" role="group" aria-labelledby="deckLabel"></div>
           <p class="note" id="deckNote"></p>
+          <label class="check" for="focus"><input type="checkbox" id="focus"><span><b>Focus on my weak spots.</b> Deals more of the rules you're slowest at or miss most, and more of the near-misses you fall for. Drill mix only.</span></label>
         </div>
         <div class="group" data-only="live">
           <span class="label">Memory</span>
@@ -510,12 +513,148 @@ fieldset.settings:disabled { opacity: .5; }
     return newCard(rnd(13) + 1);
   }
 
+  /* ---------- Weak spots ---------- */
+  // Per-rule totals across rounds, and how often each kind of near-miss drew a false slap.
+  const KEY_WEAK = 'ew-trainer.weak.v1';
+  const LURE_TYPES = ['oneoff', 'lookalike', 'neartens', 'suit'];
+  const LURE_OF = { oneoff: 'oneoff', lookalike: 'lookalike', face: 'lookalike', sum: 'neartens', suit: 'suit' };
+  const RULE_PLURAL = { double: 'doubles', sandwich: 'sandwiches', topbottom: 'top-bottoms', tens: 'tens', marriage: 'marriages', run: 'runs' };
+  const LURE_PLURAL = { oneoff: 'one-off near-misses', lookalike: 'look-alikes', neartens: 'near-tens', suit: 'same-suit cards' };
+  const pos = v => (typeof v === 'number' && isFinite(v) && v > 0 ? v : 0);
+  function cleanWeak(w) {
+    const src = w && typeof w === 'object' ? w : {};
+    const out = { rules: {}, falses: {} };
+    for (const k of RULES) {
+      const r = src.rules && src.rules[k] && typeof src.rules[k] === 'object' ? src.rules[k] : {};
+      out.rules[k] = { caught: pos(r.caught), late: pos(r.late), missed: pos(r.missed), rtSum: pos(r.rtSum), rtN: pos(r.rtN) };
+    }
+    for (const t of LURE_TYPES) out.falses[t] = pos(src.falses && src.falses[t]);
+    return out;
+  }
+  function addRoundToWeak(weak, stats) {
+    const out = cleanWeak(weak);
+    for (const k of RULES) {
+      const b = stats.by && stats.by[k];
+      if (!b) continue;
+      const r = out.rules[k];
+      r.caught += b.hit; r.late += b.late; r.missed += b.miss;
+      for (const rt of b.rts) { r.rtSum += Math.round(rt); r.rtN++; }
+    }
+    for (const [kind, n] of Object.entries(stats.falseKinds || {})) if (LURE_OF[kind]) out.falses[LURE_OF[kind]] += n;
+    return out;
+  }
+  // Weakness per enabled rule: how often it gets missed (late counts half) plus how much slower it is
+  // than your fastest rule. Rules with no catches yet count as somewhat slow.
+  function ruleWeakness(weak, rules) {
+    const rows = RULES.filter(k => rules[k]).map(k => {
+      const r = weak.rules[k], seen = r.caught + r.late + r.missed;
+      return { key: k, seen, miss: (r.missed + 0.5 * r.late + 0.5) / (seen + 2), avg: r.rtN ? r.rtSum / r.rtN : null };
+    });
+    const avgs = rows.filter(r => r.avg !== null).map(r => r.avg);
+    const fastest = avgs.length ? Math.min(...avgs) : 0;
+    for (const r of rows) {
+      r.slow = r.avg === null ? 0.3 : Math.min(1, Math.max(0, (r.avg - fastest) / 300));
+      r.score = 0.05 + r.miss + r.slow;
+    }
+    return rows;
+  }
+  // Half the mix is split evenly so every enabled rule keeps showing up; the other half follows weakness.
+  function ruleShares(weak, rules) {
+    const rows = ruleWeakness(cleanWeak(weak), rules);
+    const total = rows.reduce((s, r) => s + r.score, 0), out = {};
+    for (const r of rows) out[r.key] = 0.5 / rows.length + 0.5 * r.score / total;
+    return out;
+  }
+  const lureTypes = rules => LURE_TYPES.filter(t => t !== 'neartens' || rules.tens);
+  function lureShares(weak, rules) {
+    const w = cleanWeak(weak), types = lureTypes(rules);
+    const total = types.reduce((s, t) => s + w.falses[t] + 1, 0), out = {};
+    for (const t of types) out[t] = (w.falses[t] + 1) / total;
+    return out;
+  }
+  function focusPlan(weak, rules) {
+    const w = cleanWeak(weak);
+    const rows = ruleWeakness(w, rules);
+    const shares = ruleShares(w, rules), lures = lureShares(w, rules);
+    let lean = null;
+    const vals = Object.values(shares);
+    if (rows.length > 1 && Math.max(...vals) - Math.min(...vals) >= 0.05) {
+      const top = rows.slice().sort((a, b) => b.score - a.score)[0];
+      const known = rows.filter(r => r.avg !== null);
+      let reason = 'your weakest rule overall';
+      if (!top.seen && top.avg === null) reason = 'not much on record for it yet';
+      else if (top.avg !== null && known.length > 1 && top.avg >= Math.max(...known.map(r => r.avg))) reason = 'your slowest rule';
+      else if (top.miss >= Math.max(...rows.map(r => r.miss))) reason = 'the one you miss most';
+      lean = { rule: top.key, reason };
+    }
+    const counts = lureTypes(rules).map(t => [t, w.falses[t]]).sort((a, b) => b[1] - a[1]);
+    const lure = counts[0][1] >= 2 && (counts.length < 2 || counts[0][1] > counts[1][1]) ? counts[0][0] : null;
+    return { shares, lures, lean, lure };
+  }
+  function focusText(plan) {
+    if (!plan) return '';
+    const bits = [];
+    if (plan.lean) bits.push(`Extra ${RULE_PLURAL[plan.lean.rule]}: ${plan.lean.reason}.`);
+    if (plan.lure) bits.push(`More ${LURE_PLURAL[plan.lure]}: the near-miss you slap most.`);
+    return bits.length ? bits.join(' ') : 'No weak spot stands out yet, so the mix stayed even.';
+  }
+  function weighted(shares) {
+    const keys = Object.keys(shares);
+    let r = random() * keys.reduce((s, k) => s + shares[k], 0);
+    for (const k of keys) { r -= shares[k]; if (r < 0) return k; }
+    return keys[keys.length - 1];
+  }
+  // A card that completes this particular rule on this pile, or null.
+  function targetCardFor(pile, rules, rule) {
+    const n = pile.length;
+    if (!n || !rules[rule]) return null;
+    const top = pile[n - 1], under = n >= 2 ? pile[n - 2] : null;
+    let card = null;
+    if (rule === 'double') card = newCard(top.rank, otherSuit(top.suit));
+    else if (rule === 'sandwich' && under) card = newCard(under.rank, otherSuit(under.suit));
+    else if (rule === 'topbottom' && n >= 2) card = newCard(pile[0].rank, otherSuit(pile[0].suit));
+    else if (rule === 'tens' && top.rank <= 9) { const r = 10 - top.rank; card = newCard(r, r === top.rank ? otherSuit(top.suit) : undefined); }
+    else if (rule === 'marriage' && top.rank >= 12) card = newCard(top.rank === 12 ? 13 : 12);
+    else if (rule === 'run' && under) {
+      const next = [];
+      for (const x of runValues(under.rank)) for (const y of runValues(top.rank)) {
+        const d = y - x;
+        if (d === 1 || d === -1) { const z = y + d; if (z >= 1 && z <= 14) next.push(z === 14 ? 1 : z); }
+      }
+      if (next.length) card = newCard(pick(next));
+    }
+    return card && patternsOf(pile.concat([card]), rules).includes(rule) ? card : null;
+  }
+  function focusTarget(pile, rules, shares) {
+    const avail = {}, cards = {};
+    for (const k of Object.keys(shares)) { const c = targetCardFor(pile, rules, k); if (c) { avail[k] = shares[k]; cards[k] = c; } }
+    return Object.keys(avail).length ? cards[weighted(avail)] : null;
+  }
+  // A near-miss of one kind: one rank off, a look-alike, a near-ten or a matching suit. Never a pattern.
+  function lureCardOf(pile, rules, type) {
+    const n = pile.length;
+    if (!n) return null;
+    const top = pile[n - 1], under = n >= 2 ? pile[n - 2] : null;
+    const near = r => [r - 1, r + 1].filter(x => x >= 1 && x <= 13);
+    let ranks = [];
+    if (type === 'oneoff') { ranks = near(top.rank); if (under) ranks.push(...near(under.rank)); if (rules.topbottom && n >= 2) ranks.push(...near(pile[0].rank)); }
+    else if (type === 'lookalike') { ranks = (LOOKALIKE[top.rank] || []).slice(); if (under) ranks.push(...(LOOKALIKE[under.rank] || [])); }
+    else if (type === 'neartens') { if (top.rank <= 10) for (const s of [9, 11]) { const r = s - top.rank; if (r >= 1 && r <= 10) ranks.push(r); } }
+    else if (type === 'suit') for (let r = 1; r <= 13; r++) ranks.push(r);
+    for (const c of shuffle(ranks.map(r => newCard(r, type === 'suit' ? top.suit : undefined)))) {
+      if (completes(pile, c, rules)) continue;
+      if (LURE_OF[falseKind(pile.concat([c]), rules).kind] === type) return c;
+    }
+    return null;
+  }
+
   const DRILL_TARGET = 0.4, DRILL_LURE = 0.35;
-  function drillCard(pile, rules) {
+  // With a focus plan, the same share of targets and lures, but weighted toward your weak spots.
+  function drillCard(pile, rules, plan) {
     const r = random();
     let c = null;
-    if (r < DRILL_TARGET) c = targetCard(pile, rules);
-    else if (r < DRILL_TARGET + DRILL_LURE) c = lureCard(pile, rules);
+    if (r < DRILL_TARGET) c = plan ? focusTarget(pile, rules, plan.shares) : targetCard(pile, rules);
+    else if (r < DRILL_TARGET + DRILL_LURE) c = (plan && lureCardOf(pile, rules, weighted(plan.lures))) || lureCard(pile, rules);
     return c || neutralCard(pile, rules);
   }
 
@@ -607,7 +746,7 @@ fieldset.settings:disabled { opacity: .5; }
   const LENGTHS = [10, 20, 40];
   const PILE_COUNTS = [4, 8, 12];
   const PACE_MIN = 350, PACE_MAX = 1800, LATE_WINDOW = 450;
-  const DEFAULTS = { mode: 'live', rules: { double: true, sandwich: true, topbottom: true, tens: false, marriage: false, run: false }, pace: 900, adaptive: true, deck: 'drill', memory: true, assist: false, length: 20, piles: 8 };
+  const DEFAULTS = { mode: 'live', rules: { double: true, sandwich: true, topbottom: true, tens: false, marriage: false, run: false }, pace: 900, adaptive: true, deck: 'drill', memory: true, assist: false, length: 20, piles: 8, focus: true };
   const KEY_SETTINGS = 'ew-trainer.settings.v1', KEY_HISTORY = 'ew-trainer.history.v1';
 
   function cleanSettings(s) {
@@ -617,7 +756,7 @@ fieldset.settings:disabled { opacity: .5; }
     if (s.rules && typeof s.rules === 'object') for (const k of RULES) if (typeof s.rules[k] === 'boolean') out.rules[k] = s.rules[k];
     if (!RULES.some(k => out.rules[k])) out.rules.double = true;
     if (PACES.some(p => p.v === s.pace)) out.pace = s.pace;
-    for (const k of ['adaptive', 'memory', 'assist']) if (typeof s[k] === 'boolean') out[k] = s[k];
+    for (const k of ['adaptive', 'memory', 'assist', 'focus']) if (typeof s[k] === 'boolean') out[k] = s[k];
     if (DECKS.some(d => d.v === s.deck)) out.deck = s.deck;
     if (LENGTHS.includes(s.length)) out.length = s.length;
     if (PILE_COUNTS.includes(s.piles)) out.piles = s.piles;
@@ -642,6 +781,7 @@ fieldset.settings:disabled { opacity: .5; }
     DEFAULTS, KEY_SETTINGS, KEY_HISTORY, cleanSettings, num, cleanHistory,
     FACE_COUNT, isFace, mean, median,
     MISTAKE_CAP, pileTail, mistakeLabel, mistakeTiming,
+    KEY_WEAK, LURE_TYPES, cleanWeak, addRoundToWeak, ruleWeakness, ruleShares, lureShares, focusPlan, focusText, targetCardFor, lureCardOf,
   };
 })(window);
 </script>
@@ -657,6 +797,7 @@ fieldset.settings:disabled { opacity: .5; }
     DEFAULTS, KEY_SETTINGS, KEY_HISTORY, cleanSettings, num, cleanHistory,
     FACE_COUNT, isFace, mean, median,
     MISTAKE_CAP, pileTail, mistakeLabel, mistakeTiming,
+    KEY_WEAK, cleanWeak, addRoundToWeak, focusPlan, focusText,
   } = window.EWT;
 
   function load(key, fallback) { try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch (err) { return fallback; } }
@@ -669,6 +810,7 @@ fieldset.settings:disabled { opacity: .5; }
     interval: 900, stats: null, cardsSinceCheck: 0, nextCheck: 9,
     timer: 0, doneAt: 0, lastSummary: null, mistakes: [], mistakeCount: 0,
     history: cleanHistory(load(KEY_HISTORY, [])),
+    weak: cleanWeak(load(KEY_WEAK, null)), plan: null,
   };
 
   function freshStats() {
@@ -828,6 +970,7 @@ fieldset.settings:disabled { opacity: .5; }
       cbNewEpisode();
       say('', '', 'Win a pile first by slapping its pattern.');
     } else {
+      S.plan = S.settings.deck === 'drill' && S.settings.focus ? focusPlan(S.weak, S.settings.rules) : null;
       S.pileCap = randInt(7, 16);
       S.cardsSinceCheck = 0; S.nextCheck = randInt(7, 12);
       say('', '', 'Eyes on the pile.');
@@ -840,7 +983,7 @@ fieldset.settings:disabled { opacity: .5; }
 
   function placeCard() {
     const rules = S.settings.rules;
-    const card = S.settings.deck === 'real' ? realCard() : drillCard(S.pile, rules);
+    const card = S.settings.deck === 'real' ? realCard() : drillCard(S.pile, rules, S.plan);
     S.pile.push(card);
     const n = S.pile.length;
     const primary = patternsOf(S.pile, rules)[0] || null;
@@ -1006,6 +1149,7 @@ fieldset.settings:disabled { opacity: .5; }
       : { at: sum.at, mode: 'live', acc: sum.acc, avg: sum.avg, falses: sum.falses, pace: sum.paceEnd, deck: sum.deck });
     S.history = S.history.slice(0, 12);
     store(KEY_HISTORY, S.history);
+    if (!cb) { S.weak = addRoundToWeak(S.weak, S.stats); store(KEY_WEAK, S.weak); }
     endUi();
     if (cb) renderResultsCB(sum); else renderResults(sum);
     renderHistory();
@@ -1364,6 +1508,7 @@ fieldset.settings:disabled { opacity: .5; }
       rows, memOn: set.memory && !set.assist, mem: st.mem,
       memRight: st.mem.under[0] + st.mem.bottom[0], memTotal: st.mem.under[1] + st.mem.bottom[1],
       paceStart: set.pace, paceEnd: Math.round(S.interval), adaptive: set.adaptive, deck: set.deck,
+      focus: S.plan ? focusText(S.plan) : null,
       rules: RULES.filter(k => set.rules[k]), cards: st.cards,
       mistakes: S.mistakes.slice(), mistakeCount: S.mistakeCount,
     };
@@ -1420,6 +1565,8 @@ fieldset.settings:disabled { opacity: .5; }
     const ruleNames = sum.rules.map(k => (RULE_UI.find(r => r.key === k) || { name: k }).name).join(', ');
     const pace = sum.adaptive && sum.paceEnd !== sum.paceStart ? `${sum.paceStart} → ${sum.paceEnd} ms` : `${sum.paceStart} ms`;
     $('resultsMeta').textContent = `${DECK_NAME[sum.deck] || 'Drill mix'} · ${ruleNames} · pace ${pace}`;
+    $('rFocus').textContent = sum.focus ? `Focus: ${sum.focus}` : '';
+    $('rFocus').hidden = !sum.focus;
 
     $('tAvgL').textContent = 'Average reaction';
     $('rAvg').innerHTML = sum.avg === null ? '–' : `${sum.avg}<small>ms</small>`;
@@ -1504,6 +1651,7 @@ fieldset.settings:disabled { opacity: .5; }
 
   function renderResultsCB(sum) {
     $('results').hidden = false;
+    $('rFocus').hidden = true;
     $('resultsMeta').textContent = `Comebacks · ${sum.eps.length} piles · pace ${sum.pace} ms · ${sum.falses} false slap${sum.falses === 1 ? '' : 's'}`;
 
     $('tAvgL').textContent = 'Comeback reaction';
@@ -1703,7 +1851,7 @@ fieldset.settings:disabled { opacity: .5; }
     buildSeg('deckSeg', DECKS.map(d => ({ v: d.v, html: d.name })), 'deck');
     buildSeg('lenSeg', LENGTHS.map(n => ({ v: n, html: `${n}<small>patterns</small>` })), 'length');
     buildSeg('pilesSeg', PILE_COUNTS.map(n => ({ v: n, html: `${n}<small>piles</small>` })), 'piles');
-    for (const [id, key] of [['adaptive', 'adaptive'], ['memory', 'memory'], ['assistBox', 'assist']]) {
+    for (const [id, key] of [['adaptive', 'adaptive'], ['memory', 'memory'], ['assistBox', 'assist'], ['focus', 'focus']]) {
       $(id).addEventListener('change', ev => { S.settings[key] = ev.target.checked; saveSettings(); syncSettings(); });
     }
   }
@@ -1715,6 +1863,8 @@ fieldset.settings:disabled { opacity: .5; }
     $('adaptive').checked = S.settings.adaptive;
     $('memory').checked = S.settings.memory;
     $('assistBox').checked = S.settings.assist;
+    $('focus').checked = S.settings.focus;
+    $('focus').disabled = S.settings.deck !== 'drill';
     $('deckNote').textContent = (DECKS.find(d => d.v === S.settings.deck) || DECKS[0]).note;
     $('modeNote').textContent = (MODES.find(m => m.v === S.settings.mode) || MODES[0]).note;
     for (const el of document.querySelectorAll('[data-only]')) el.hidden = el.dataset.only !== S.settings.mode;
