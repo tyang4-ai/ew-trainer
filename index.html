@@ -1,0 +1,1649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Egyptian War Trainer</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<meta name="theme-color" content="#0d1b2a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="EW Trainer">
+<style>
+/* Fonts ship with the app so it looks the same offline. */
+@font-face { font-family: "Archivo"; src: url("fonts/archivo.woff2") format("woff2-variations"), url("fonts/archivo.woff2") format("woff2"); font-weight: 100 900; font-stretch: 62% 125%; font-style: normal; font-display: swap; }
+@font-face { font-family: "Bodoni Moda"; src: url("fonts/bodoni-moda.woff2") format("woff2-variations"), url("fonts/bodoni-moda.woff2") format("woff2"); font-weight: 400 900; font-style: normal; font-display: swap; }
+@font-face { font-family: "Bodoni Moda"; src: url("fonts/bodoni-moda-italic.woff2") format("woff2-variations"), url("fonts/bodoni-moda-italic.woff2") format("woff2"); font-weight: 400 900; font-style: italic; font-display: swap; }
+:root {
+  /* Single-theme by choice: a navy card table at night.
+     Layout: the pile is the hero on the left, the drill setup sits beside it, and both stack on phones. */
+  --table: #0d1b2a;
+  --raise: #132a40;
+  --rule: #27435f;
+  --stock: #f6efe2;
+  --ink: #111418;
+  --suit-red: #c4232f;
+  --text: #e9e3d5;
+  --muted: #97a8bb;
+  /* Feedback colors, kept apart from the palette */
+  --hit: #45d49f;
+  --late: #f2b33d;
+  --false: #ff5f6d;
+  --display: "Bodoni Moda", "Bodoni 72", Didot, Georgia, serif;
+  --body: "Archivo", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; touch-action: manipulation; }
+body { margin: 0; background: var(--table); color: var(--text); font: 400 16px/1.5 var(--body); -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+.app {
+  max-width: 1200px; margin: 0 auto; padding: calc(28px + env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) calc(56px + env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
+  display: grid; gap: 24px;
+  grid-template-columns: minmax(0, 1.5fr) minmax(300px, 1fr);
+  grid-template-areas: "head head" "table side";
+  align-items: start;
+}
+
+/* Masthead */
+.masthead { grid-area: head; display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 10px 32px; padding-bottom: 16px; border-bottom: 1px solid var(--rule); }
+.masthead h1 { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(2.1rem, 5vw, 3.4rem); line-height: .95; letter-spacing: -.015em; color: var(--stock); text-wrap: balance; }
+.masthead h1 em { font-style: italic; font-weight: 500; color: var(--muted); }
+.masthead p { margin: 0; max-width: 46ch; color: var(--muted); font-size: .98rem; }
+
+/* Table column */
+.table { grid-area: table; display: grid; gap: 12px; min-width: 0; }
+@media (min-width: 881px) { .table { position: sticky; top: 16px; } }
+.hud { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.hud-item { display: grid; grid-template-rows: 1fr auto; gap: 1px; min-width: 0; padding: 8px 12px; background: var(--raise); border: 1px solid var(--rule); border-radius: 10px; }
+.label { font-stretch: 72%; font-weight: 700; font-size: .7rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.hud-val { font-weight: 700; font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+
+.felt {
+  position: relative; display: grid; place-items: center; min-height: clamp(380px, 54vw, 540px);
+  border-radius: 20px; border: 1px solid var(--rule); overflow: hidden;
+  background-color: #12283f;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    radial-gradient(120% 100% at 50% 30%, #1b3b5c 0%, #12283f 52%, #0a1726 100%);
+  box-shadow: inset 0 0 0 7px rgba(0, 0, 0, .16), inset 0 3px 36px rgba(0, 0, 0, .5);
+  cursor: pointer; outline: none;
+  touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+}
+.felt:focus-visible { outline: 2px solid rgba(246, 239, 226, .45); outline-offset: 3px; }
+.felt.live:focus-visible { outline-color: transparent; }
+.felt::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; box-shadow: inset 0 0 0 3px var(--flash, transparent), inset 0 0 70px var(--glow, transparent); }
+.felt.f-hit { --flash: var(--hit); --glow: rgba(69, 212, 159, .22); }
+.felt.f-late, .felt.f-miss { --flash: var(--late); --glow: rgba(242, 179, 61, .18); }
+.felt.f-false { --flash: var(--false); --glow: rgba(255, 95, 109, .22); }
+.felt.flash::after { animation: flash 480ms ease-out; }
+@keyframes flash { from { opacity: 1; } to { opacity: 0; } }
+
+.felt-inner { display: grid; justify-items: center; gap: 16px; width: 100%; padding: 30px 16px 26px; }
+.felt.cb .felt-inner { padding-top: 46px; padding-bottom: 44px; }
+.pile-tag { font-stretch: 72%; font-weight: 700; font-size: .72rem; letter-spacing: .14em; text-transform: uppercase; color: var(--stock); padding: 4px 11px; border-radius: 999px; border: 1px solid rgba(246, 239, 226, .3); background: rgba(246, 239, 226, .08); visibility: hidden; }
+.pile-tag.on { visibility: visible; }
+
+/* Two seats for the comeback drill */
+.seat { position: absolute; left: 16px; z-index: 2; display: flex; align-items: center; gap: 8px; font-stretch: 72%; font-weight: 700; font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.seat::before { content: ""; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid currentColor; }
+.seat.on { color: var(--stock); }
+.seat.on::before { background: var(--stock); }
+.seat-them { top: 14px; }
+.seat-you { bottom: 14px; }
+.chip { position: absolute; top: 11px; right: 14px; z-index: 2; padding: 4px 10px; border-radius: 999px; border: 1px solid rgba(246, 239, 226, .4); background: rgba(246, 239, 226, .08); color: var(--stock); font-weight: 700; font-size: .76rem; font-stretch: 85%; }
+
+/* Cards */
+.pile { --cw: clamp(116px, 22vw, 164px); position: relative; width: var(--cw); height: calc(var(--cw) * 1.4); }
+.card { position: absolute; inset: 0; border-radius: calc(var(--cw) * .075); transform: translate(var(--dx, 0px), var(--dy, 0px)) rotate(var(--rot, 0deg)); }
+.card.edge { background: linear-gradient(170deg, #efe6d4, #e2d7c2); border: 1px solid rgba(17, 20, 24, .14); box-shadow: 0 1px 0 rgba(0, 0, 0, .35), 0 6px 14px rgba(0, 0, 0, .3); }
+.card.face { background: var(--stock); color: var(--ink); border: 1px solid rgba(17, 20, 24, .16); box-shadow: 0 1px 0 rgba(0, 0, 0, .4), 0 16px 30px rgba(0, 0, 0, .45); font-family: var(--display); }
+.card.face.red { color: var(--suit-red); }
+.card .idx { position: absolute; display: grid; justify-items: center; line-height: .9; }
+.card .idx.tl { top: 6%; left: 8%; }
+.card .idx.br { bottom: 6%; right: 8%; transform: rotate(180deg); }
+.card .idx b { font-weight: 800; font-size: calc(var(--cw) * .16); letter-spacing: -.02em; }
+.card.ten .idx b { letter-spacing: -.08em; }
+.card .idx i, .card .mid i { font-style: normal; font-family: var(--body); }
+.card .idx i { font-size: calc(var(--cw) * .12); margin-top: 2px; }
+.card .mid { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; line-height: .85; }
+.card .mid b { font-weight: 800; font-size: calc(var(--cw) * .5); letter-spacing: -.03em; }
+.card.ten .mid b { font-size: calc(var(--cw) * .4); letter-spacing: -.07em; }
+.card .mid i { font-size: calc(var(--cw) * .22); margin-top: calc(var(--cw) * .04); }
+.card.face.drop { --from: -22px; animation: land 110ms cubic-bezier(.2, .9, .25, 1) both; }
+.card.face.drop.from-you { --from: 22px; }
+@keyframes land {
+  from { transform: translate(var(--dx, 0px), calc(var(--dy, 0px) + var(--from, -22px))) rotate(calc(var(--rot, 0deg) - 9deg)) scale(1.05); }
+  to { transform: translate(var(--dx, 0px), var(--dy, 0px)) rotate(var(--rot, 0deg)) scale(1); }
+}
+.spot { position: absolute; inset: 0; border-radius: calc(var(--cw) * .075); border: 2px dashed rgba(246, 239, 226, .22); }
+
+/* Training wheels */
+.assist { display: flex; gap: 10px; justify-content: center; min-height: 76px; }
+.mini { display: grid; justify-items: center; gap: 4px; }
+.mini-label { font-stretch: 72%; font-weight: 700; font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.mini-face { width: 42px; height: 56px; border-radius: 6px; background: var(--stock); color: var(--ink); display: grid; place-content: center; justify-items: center; line-height: .9; font-family: var(--display); }
+.mini.red .mini-face { color: var(--suit-red); }
+.mini-face b { font-weight: 800; font-size: 1.1rem; }
+.mini-face i { font-style: normal; font-family: var(--body); font-size: .8rem; }
+
+/* Feedback */
+.readout { display: grid; justify-items: center; gap: 4px; min-height: 96px; text-align: center; transition: opacity .45s ease; }
+.readout.fade { opacity: .42; }
+.readout-num { min-height: 1em; font-family: var(--display); font-weight: 800; font-size: clamp(2.6rem, 6.5vw, 4.2rem); line-height: 1; letter-spacing: -.02em; color: var(--stock); font-variant-numeric: lining-nums tabular-nums; }
+.readout-num small { margin-left: .4em; font-family: var(--body); font-size: .8rem; font-weight: 700; font-stretch: 72%; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.readout-sub { max-width: 40ch; min-height: 1.5em; font-size: .95rem; text-wrap: balance; }
+.readout.is-hit .readout-num { color: var(--hit); }
+.readout.is-late .readout-num, .readout.is-miss .readout-num { color: var(--late); }
+.readout.is-false .readout-num { color: var(--false); }
+.prompt { margin: 0; color: var(--muted); font-size: .95rem; text-align: center; }
+kbd { padding: 2px 6px 3px; border-radius: 5px; border: 1px solid rgba(246, 239, 226, .32); border-bottom-width: 2px; background: rgba(246, 239, 226, .08); color: var(--text); font: 700 .8em/1 var(--body); white-space: nowrap; }
+
+/* Memory check and lock-in */
+.recall { position: absolute; left: 12px; right: 12px; bottom: 12px; z-index: 3; display: grid; gap: 10px; padding: 14px; border-radius: 14px; border: 1px solid var(--rule); background: rgba(8, 17, 28, .96); box-shadow: 0 18px 40px rgba(0, 0, 0, .45); cursor: default; }
+.recall-q { margin: 0; font-family: var(--display); font-weight: 700; font-size: 1.2rem; line-height: 1.25; color: var(--stock); text-wrap: balance; }
+.recall-hint { margin: 0; font-size: .78rem; color: var(--muted); }
+.ranks { display: grid; grid-template-columns: repeat(13, minmax(0, 1fr)); gap: 5px; }
+.rank-btn { appearance: none; min-height: 42px; padding: 0; border-radius: 7px; border: 1px solid #d8ccb4; background: var(--stock); color: var(--ink); font-family: var(--display); font-weight: 800; font-size: 1.05rem; font-variant-numeric: lining-nums; cursor: pointer; }
+.rank-btn:hover:not(:disabled) { background: #fffaf0; }
+.rank-btn:disabled { cursor: default; }
+.rank-btn:disabled:not(.right):not(.wrong) { opacity: .4; }
+.rank-btn.right { background: var(--hit); border-color: var(--hit); color: #06261a; }
+.rank-btn.wrong { background: var(--false); border-color: var(--false); color: #2b0509; }
+
+/* Controls under the table */
+.table-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; }
+.keys { color: var(--muted); font-size: .88rem; }
+.btn { appearance: none; border: 1px solid transparent; border-radius: 999px; padding: 11px 20px; font-weight: 700; font-size: 1rem; line-height: 1.1; cursor: pointer; }
+.btn-primary { background: var(--stock); color: var(--ink); font-family: var(--display); font-size: 1.12rem; }
+.btn-primary:hover { background: #fffaf0; }
+.btn-ghost { background: transparent; color: var(--text); border-color: var(--rule); }
+.btn-ghost:hover { border-color: var(--muted); }
+.btn:focus-visible, .rule:focus-visible, .rank-btn:focus-visible, .check input:focus-visible { outline: 2px solid var(--stock); outline-offset: 3px; }
+
+/* Side column */
+.side { grid-area: side; display: grid; gap: 16px; min-width: 0; }
+.panel { display: grid; gap: 16px; padding: 20px; background: var(--raise); border: 1px solid var(--rule); border-radius: 16px; min-width: 0; }
+.panel h2 { margin: 0; font-family: var(--display); font-weight: 700; font-size: 1.45rem; line-height: 1.1; color: var(--stock); text-wrap: balance; }
+.panel h3 { margin: 0; font-family: var(--display); font-weight: 700; font-size: 1.1rem; color: var(--stock); }
+.meta { margin: -8px 0 0; color: var(--muted); font-size: .85rem; }
+.note { margin: 0; color: var(--muted); font-size: .82rem; line-height: 1.4; }
+.note.warn { color: var(--late); }
+fieldset.settings { display: grid; gap: 18px; min-width: 0; margin: 0; padding: 0; border: 0; }
+fieldset.settings:disabled { opacity: .5; }
+.group { display: grid; gap: 8px; }
+.rules { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.rule { appearance: none; display: grid; gap: 3px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--rule); background: transparent; text-align: left; cursor: pointer; }
+.rule:hover { border-color: var(--muted); }
+.rule[aria-pressed="true"] { background: var(--stock); border-color: var(--stock); color: var(--ink); }
+.rule-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 2px 8px; }
+.rule-name { font-weight: 700; }
+.rule-eg { font-family: var(--display); font-weight: 800; letter-spacing: .02em; white-space: nowrap; }
+.rule[aria-pressed="true"] .rule-eg { color: var(--suit-red); }
+.rule-desc { font-size: .8rem; line-height: 1.35; opacity: .8; }
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); border: 1px solid var(--rule); border-radius: 12px; overflow: hidden; }
+.seg button { appearance: none; display: grid; gap: 1px; justify-items: center; padding: 9px 4px; border: 0; background: transparent; font-size: .92rem; font-weight: 600; line-height: 1.15; text-align: center; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--rule); }
+.seg button small { font-size: .72rem; font-weight: 500; opacity: .75; font-variant-numeric: tabular-nums; }
+.seg button[aria-pressed="true"] { background: var(--stock); color: var(--ink); }
+.seg button:hover:not([aria-pressed="true"]) { background: rgba(246, 239, 226, .06); }
+.seg button:focus-visible { outline: 2px solid var(--stock); outline-offset: -4px; }
+.check { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; font-size: .9rem; line-height: 1.4; cursor: pointer; }
+.check input { width: 18px; height: 18px; margin: 1px 0 0; accent-color: var(--stock); cursor: pointer; }
+.check b { color: var(--stock); font-weight: 700; }
+
+/* Results */
+.tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.tile { display: grid; gap: 2px; align-content: start; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--rule); border-top: 3px solid var(--rule); background: rgba(0, 0, 0, .18); }
+.tile.lvl-good { border-top-color: var(--hit); }
+.tile.lvl-mid { border-top-color: var(--late); }
+.tile.lvl-low { border-top-color: var(--false); }
+.tile-num { font-family: var(--display); font-weight: 800; font-size: 2.1rem; line-height: 1; color: var(--stock); font-variant-numeric: lining-nums tabular-nums; }
+.tile-num small { margin-left: 4px; font-family: var(--body); font-size: .78rem; font-weight: 700; font-stretch: 72%; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.tile-label { font-weight: 600; font-size: .85rem; }
+.tile-sub { font-size: .78rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.table-wrap { overflow-x: auto; }
+.breakdown { width: 100%; border-collapse: collapse; font-size: .9rem; font-variant-numeric: tabular-nums; }
+.breakdown th, .breakdown td { padding: 7px 6px; text-align: right; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+.breakdown th:first-child, .breakdown td:first-child { text-align: left; padding-left: 0; }
+.breakdown th:last-child, .breakdown td:last-child { padding-right: 0; }
+.breakdown thead th { font-stretch: 72%; font-weight: 700; font-size: .7rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.breakdown tbody th { font-weight: 600; }
+.breakdown .wrap { white-space: normal; text-align: left; min-width: 8rem; }
+.avgcell { display: inline-flex; align-items: center; gap: 8px; }
+.bar { display: inline-block; width: calc(52px * var(--w, 0)); height: 6px; border-radius: 3px; background: var(--stock); opacity: .55; }
+.coach { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.coach li { padding: 4px 0 4px 12px; border-left: 3px solid var(--muted); font-size: .93rem; line-height: 1.45; }
+.coach li.false { border-left-color: var(--false); }
+.coach li.late, .coach li.miss { border-left-color: var(--late); }
+.coach li.mem { border-left-color: var(--stock); }
+.coach li.good { border-left-color: var(--hit); }
+
+/* How it works + history */
+.steps { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; counter-reset: step; }
+.steps li { counter-increment: step; display: grid; grid-template-columns: 26px 1fr; gap: 8px; font-size: .92rem; line-height: 1.45; }
+.steps li::before { content: counter(step); font-family: var(--display); font-weight: 800; font-size: 1.25rem; line-height: 1.15; color: var(--stock); }
+.history-wrap { display: grid; gap: 10px; padding-top: 14px; border-top: 1px solid var(--rule); }
+.history { display: grid; margin: 0; padding: 0; list-style: none; }
+.history li { display: grid; grid-template-columns: minmax(0, 1.8fr) repeat(4, minmax(0, 1fr)); gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--rule); font-size: .84rem; font-variant-numeric: tabular-nums; }
+.history li > span:not(.h-when) { text-align: right; }
+.history .h-when { color: var(--muted); }
+.history .h-head span { font-stretch: 72%; font-weight: 700; font-size: .68rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+
+@media (max-width: 880px) {
+  .app { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "table" "side"; padding: calc(14px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) calc(44px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); gap: 18px; }
+}
+@media (max-width: 600px) {
+  .ranks { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+  .rank-btn { min-height: 44px; }
+  .hud { gap: 6px; }
+  .hud-item { padding: 7px 9px; }
+  .hud-val { font-size: 1rem; }
+  .panel { padding: 16px; }
+}
+@media (max-width: 420px) {
+  .history li { grid-template-columns: minmax(0, 1.6fr) repeat(2, minmax(0, 1fr)); }
+  .history .h-false, .history .h-pace { display: none; }
+}
+@media (max-width: 380px) { .rules { grid-template-columns: minmax(0, 1fr); } }
+@media (prefers-reduced-motion: reduce) {
+  .card.face.drop, .felt.flash::after { animation: none; }
+  .readout { transition: none; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="masthead">
+    <h1>Egyptian War <em>Trainer</em></h1>
+    <p>Drills for the mental side of the game. Spot patterns the instant they land, keep track of the cards buried under the top one, and catch your won piles when they come back around.</p>
+  </header>
+
+  <section class="table" aria-label="Practice table">
+    <div class="hud">
+      <div class="hud-item"><span class="label" id="hudL1">Patterns</span><span class="hud-val" id="hudPatterns">0 / 20</span></div>
+      <div class="hud-item"><span class="label" id="hudL2">Caught</span><span class="hud-val" id="hudCaught">0</span></div>
+      <div class="hud-item"><span class="label">False slaps</span><span class="hud-val" id="hudFalse">0</span></div>
+      <div class="hud-item"><span class="label">Pace</span><span class="hud-val" id="hudPace">900 ms</span></div>
+    </div>
+
+    <div class="felt" id="felt" tabindex="0" role="region" aria-label="Card table" aria-describedby="keysHint">
+      <span class="seat seat-them" id="seatThem" hidden>Them</span>
+      <span class="chip" id="chip" hidden></span>
+      <div class="felt-inner">
+        <span class="pile-tag" id="pileTag">New pile</span>
+        <div class="pile" id="pile"></div>
+        <div class="assist" id="assist" hidden></div>
+        <div class="readout" id="readout" aria-live="polite">
+          <div class="readout-num" id="readoutNum"></div>
+          <div class="readout-sub" id="readoutSub"></div>
+        </div>
+        <p class="prompt" id="prompt">Press <kbd>Space</kbd> or tap the table to start</p>
+      </div>
+      <span class="seat seat-you" id="seatYou" hidden>You</span>
+      <div class="recall" id="recall" hidden>
+        <p class="recall-q" id="recallQ">Memory check: what rank is under the top card?</p>
+        <div class="ranks" id="ranks"></div>
+        <p class="recall-hint" id="recallHint">Keys work too: A, 2 to 9, 0 for 10, J, Q, K.</p>
+      </div>
+    </div>
+
+    <div class="table-foot">
+      <button type="button" class="btn btn-primary" id="startBtn">Start round</button>
+      <button type="button" class="btn btn-ghost" id="stopBtn" tabindex="-1" hidden>Stop</button>
+      <span class="keys" id="keysHint"><kbd>Space</kbd> or tap to slap · <kbd>Esc</kbd> to stop</span>
+    </div>
+  </section>
+
+  <aside class="side">
+    <section class="panel results" id="results" hidden aria-labelledby="resultsTitle">
+      <h2 id="resultsTitle">Last round</h2>
+      <p class="meta" id="resultsMeta"></p>
+      <div class="tiles">
+        <div class="tile" id="tileAvg"><div class="tile-num" id="rAvg">–</div><div class="tile-label" id="tAvgL">Average reaction</div><div class="tile-sub" id="rAvgSub"></div></div>
+        <div class="tile" id="tileAcc"><div class="tile-num" id="rAcc">–</div><div class="tile-label" id="tAccL">Patterns caught</div><div class="tile-sub" id="rAccSub"></div></div>
+        <div class="tile" id="tileFalse"><div class="tile-num" id="rFalse">–</div><div class="tile-label" id="tFalseL">False slaps</div><div class="tile-sub" id="rFalseSub"></div></div>
+        <div class="tile" id="tileMem"><div class="tile-num" id="rMem">–</div><div class="tile-label" id="tMemL">Memory checks</div><div class="tile-sub" id="rMemSub"></div></div>
+      </div>
+      <div class="table-wrap">
+        <table class="breakdown">
+          <thead id="rHead"><tr><th scope="col">Pattern</th><th scope="col">Caught</th><th scope="col">Late</th><th scope="col">Missed</th><th scope="col">Avg</th></tr></thead>
+          <tbody id="rRows"></tbody>
+        </table>
+      </div>
+      <ul class="coach" id="rCoach"></ul>
+    </section>
+
+    <section class="panel" aria-labelledby="setupTitle">
+      <h2 id="setupTitle">Drill setup</h2>
+      <p class="note" id="lockNote" hidden>Settings are locked until the round ends.</p>
+      <fieldset class="settings" id="settings">
+        <legend class="sr-only">Drill settings</legend>
+        <div class="group">
+          <span class="label" id="modeLabel">Drill</span>
+          <div class="seg" id="modeSeg" role="group" aria-labelledby="modeLabel"></div>
+          <p class="note" id="modeNote"></p>
+        </div>
+        <div class="group" data-only="live">
+          <span class="label" id="rulesLabel">Slap on</span>
+          <div class="rules" id="rules" role="group" aria-labelledby="rulesLabel"></div>
+          <p class="note" id="rulesNote">Match the rules your group plays.</p>
+        </div>
+        <div class="group">
+          <span class="label" id="paceLabel">Pace: time before the next card lands</span>
+          <div class="seg" id="paceSeg" role="group" aria-labelledby="paceLabel"></div>
+          <label class="check" for="adaptive" data-only="live"><input type="checkbox" id="adaptive"><span><b>Adapt to me.</b> Deals faster while you're clean and slower when you miss.</span></label>
+        </div>
+        <div class="group" data-only="live">
+          <span class="label" id="deckLabel">Deck</span>
+          <div class="seg" id="deckSeg" role="group" aria-labelledby="deckLabel"></div>
+          <p class="note" id="deckNote"></p>
+        </div>
+        <div class="group" data-only="live">
+          <span class="label">Memory</span>
+          <label class="check" for="memory"><input type="checkbox" id="memory"><span><b>Memory checks.</b> Every so often the deal stops and asks what's buried.</span></label>
+          <label class="check" for="assistBox"><input type="checkbox" id="assistBox"><span><b>Show the cards underneath.</b> Training wheels. Memory checks are skipped while it's on.</span></label>
+        </div>
+        <div class="group" data-only="live">
+          <span class="label" id="lenLabel">Round length</span>
+          <div class="seg" id="lenSeg" role="group" aria-labelledby="lenLabel"></div>
+        </div>
+        <div class="group" data-only="comeback">
+          <span class="label" id="pilesLabel">Round length</span>
+          <div class="seg" id="pilesSeg" role="group" aria-labelledby="pilesLabel"></div>
+        </div>
+      </fieldset>
+    </section>
+
+    <section class="panel" aria-labelledby="howTitle">
+      <h2 id="howTitle">How a round works</h2>
+      <ol class="steps" data-only="live">
+        <li><span>Cards land one at a time. Once a card is covered you can't see it again, same as a real pile.</span></li>
+        <li><span>Press <kbd>Space</kbd> or tap the table when the top card completes one of your rules. You have until the next card lands.</span></li>
+        <li><span>Each catch shows your reaction time. Memory checks pause the deal and ask what's under the top card or what started the pile.</span></li>
+      </ol>
+      <ol class="steps" data-only="comeback">
+        <li><span>You and one other player take turns. Your cards come in from the bottom of the table, theirs from the top. Face cards work as usual: J, Q, K and A give the other player 1, 2, 3 or 4 tries to answer.</span></li>
+        <li><span>Slap the pattern to win the pile, then lock in the card that landed right before the pattern. That card is your cue.</span></li>
+        <li><span>The pile goes under your deck. When your cue comes back out, you know your next cards. On normal turns their cards land between yours, so a won double comes back as a sandwich and a won sandwich comes back split up. When you're answering a face card your cards land back-to-back, so either one comes back as you won it.</span></li>
+      </ol>
+      <div class="history-wrap" id="historyWrap" hidden>
+        <h3>Recent rounds</h3>
+        <ol class="history" id="history"></ol>
+        <p class="note" id="bestNote"></p>
+      </div>
+    </section>
+  </aside>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  /* ---------- Cards and house rules ---------- */
+  const RANK = [null, 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+  const RANK_NAME = [null, 'ace', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'jack', 'queen', 'king'];
+  const SUIT = ['♠', '♥', '♦', '♣'];
+  const SUIT_NAME = ['spades', 'hearts', 'diamonds', 'clubs'];
+  const IS_RED = [false, true, true, false];
+  const TEXT_STYLE = '︎';
+  const RULES = ['double', 'sandwich', 'topbottom', 'tens', 'marriage', 'run'];
+  const RULE_NAME = { double: 'Double', sandwich: 'Sandwich', topbottom: 'Top-bottom', tens: 'Tens', marriage: 'Marriage', run: 'Run' };
+  const RULE_UI = [
+    { key: 'double', name: 'Doubles', eg: '7 · 7', desc: 'Same rank as the card right under it' },
+    { key: 'sandwich', name: 'Sandwiches', eg: '7 · 4 · 7', desc: 'Same rank as the card two down' },
+    { key: 'topbottom', name: 'Top-bottom', eg: '9 … 9', desc: 'Same rank as the card that started the pile' },
+    { key: 'tens', name: 'Tens', eg: '3 + 7', desc: 'Two in a row that add up to 10, with A as 1' },
+    { key: 'marriage', name: 'Marriage', eg: 'K · Q', desc: 'A king and a queen touching, either order' },
+    { key: 'run', name: 'Runs', eg: '5 · 6 · 7', desc: 'Three in a row, up or down. A can be high or low' },
+  ];
+  const LOOKALIKE = { 3: [8], 8: [3], 6: [9], 9: [6], 11: [12, 13], 12: [11, 13], 13: [11, 12] };
+
+  const rnd = n => Math.floor(Math.random() * n);
+  const pick = a => a[rnd(a.length)];
+  const randInt = (lo, hi) => lo + rnd(hi - lo + 1);
+  const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const tenValue = r => (r <= 10 ? r : 0);
+  const runValues = r => (r === 1 ? [1, 14] : [r]);
+
+  function isRun(a, b, c) {
+    for (const x of runValues(a)) for (const y of runValues(b)) for (const z of runValues(c)) {
+      const d1 = y - x, d2 = z - y;
+      if ((d1 === 1 && d2 === 1) || (d1 === -1 && d2 === -1)) return true;
+    }
+    return false;
+  }
+
+  // Rules the top card of the pile completes, in priority order.
+  function patternsOf(pile, rules) {
+    const n = pile.length;
+    if (n < 2) return [];
+    const t = pile[n - 1].rank, a = pile[n - 2].rank, b = n >= 3 ? pile[n - 3].rank : 0;
+    const out = [];
+    if (rules.double && t === a) out.push('double');
+    if (rules.sandwich && n >= 3 && t === b) out.push('sandwich');
+    if (rules.topbottom && n >= 3 && t === pile[0].rank) out.push('topbottom');
+    if (rules.tens) { const x = tenValue(t), y = tenValue(a); if (x && y && x + y === 10) out.push('tens'); }
+    if (rules.marriage && ((t === 13 && a === 12) || (t === 12 && a === 13))) out.push('marriage');
+    if (rules.run && n >= 3 && isRun(b, a, t)) out.push('run');
+    return out;
+  }
+
+  const newCard = (rank, suit) => ({ rank, suit: suit === undefined ? rnd(4) : suit, rot: Math.random() * 14 - 7, dx: Math.random() * 12 - 6, dy: Math.random() * 10 - 5 });
+  const otherSuit = s => (s + 1 + rnd(3)) % 4;
+  const completes = (pile, card, rules) => patternsOf(pile.concat([card]), rules).length > 0;
+
+  // A card that completes one of the enabled rules, or null when none can be completed here.
+  function targetCard(pile, rules) {
+    const n = pile.length;
+    if (!n) return null;
+    const top = pile[n - 1], under = n >= 2 ? pile[n - 2] : null;
+    const makers = [];
+    const same = c => () => newCard(c.rank, otherSuit(c.suit));
+    if (rules.double) makers.push(same(top));
+    if (rules.sandwich && under) makers.push(same(under));
+    if (rules.topbottom && n >= 2) makers.push(same(pile[0]));
+    if (rules.tens && top.rank <= 9) makers.push(() => { const r = 10 - top.rank; return newCard(r, r === top.rank ? otherSuit(top.suit) : undefined); });
+    if (rules.marriage && top.rank >= 12) makers.push(() => newCard(top.rank === 12 ? 13 : 12));
+    if (rules.run && under) {
+      const next = [];
+      for (const x of runValues(under.rank)) for (const y of runValues(top.rank)) {
+        const d = y - x;
+        if (d === 1 || d === -1) { const z = y + d; if (z >= 1 && z <= 14) next.push(z === 14 ? 1 : z); }
+      }
+      if (next.length) makers.push(() => newCard(pick(next)));
+    }
+    if (!makers.length) return null;
+    const card = pick(makers)();
+    return completes(pile, card, rules) ? card : null;
+  }
+
+  // A near-miss: one rank off, a look-alike, a near-ten or a matching suit. Never a real pattern.
+  function lureCard(pile, rules) {
+    const n = pile.length;
+    if (!n) return null;
+    const top = pile[n - 1], under = n >= 2 ? pile[n - 2] : null;
+    const near = r => [r - 1, r + 1].filter(x => x >= 1 && x <= 13);
+    const ranks = [...near(top.rank), ...(LOOKALIKE[top.rank] || [])];
+    if (under) ranks.push(...near(under.rank), ...(LOOKALIKE[under.rank] || []));
+    if (rules.topbottom && n >= 2) ranks.push(...near(pile[0].rank));
+    if (rules.tens && top.rank <= 10) for (const s of [9, 11]) { const r = s - top.rank; if (r >= 1 && r <= 10) ranks.push(r); }
+    const cands = shuffle(ranks.map(r => newCard(r)));
+    cands.splice(rnd(cands.length + 1), 0, newCard(rnd(13) + 1, top.suit));
+    for (const c of cands) if (!completes(pile, c, rules)) return c;
+    return null;
+  }
+
+  function neutralCard(pile, rules) {
+    for (let i = 0; i < 60; i++) { const c = newCard(rnd(13) + 1); if (!completes(pile, c, rules)) return c; }
+    return newCard(rnd(13) + 1);
+  }
+
+  const DRILL_TARGET = 0.4, DRILL_LURE = 0.35;
+  function drillCard(pile, rules) {
+    const r = Math.random();
+    let c = null;
+    if (r < DRILL_TARGET) c = targetCard(pile, rules);
+    else if (r < DRILL_TARGET + DRILL_LURE) c = lureCard(pile, rules);
+    return c || neutralCard(pile, rules);
+  }
+
+  let shoe = [];
+  function realCard() {
+    if (!shoe.length) { for (let r = 1; r <= 13; r++) for (let s = 0; s < 4; s++) shoe.push(newCard(r, s)); shuffle(shoe); }
+    return shoe.pop();
+  }
+
+  // Why a slap on this pile was wrong, for the feedback line and the coaching notes.
+  function falseKind(pile, rules) {
+    const n = pile.length;
+    if (n < 2) return { kind: 'other' };
+    const t = pile[n - 1], a = pile[n - 2], b = n >= 3 ? pile[n - 3] : null;
+    const look = LOOKALIKE[t.rank] || [];
+    for (const c of [a, b]) if (c && look.includes(c.rank)) return { kind: t.rank >= 11 ? 'face' : 'lookalike', t: t.rank, o: c.rank };
+    for (const c of [a, b, rules.topbottom && n >= 3 ? pile[0] : null]) if (c && Math.abs(c.rank - t.rank) === 1) return { kind: 'oneoff', t: t.rank, o: c.rank };
+    if (rules.tens && t.rank <= 10 && a.rank <= 10 && Math.abs(t.rank + a.rank - 10) === 1) return { kind: 'sum', t: t.rank, o: a.rank, sum: t.rank + a.rank };
+    if (t.suit === a.suit) return { kind: 'suit' };
+    return { kind: 'other' };
+  }
+  function falseText(f) {
+    switch (f.kind) {
+      case 'lookalike': return `${RANK[f.t]} isn't ${RANK[f.o]}. Look-alikes don't count.`;
+      case 'face': return `${RANK[f.t]} isn't ${RANK[f.o]}. Read the letter.`;
+      case 'oneoff': return `${RANK[f.t]} is one off from ${RANK[f.o]}.`;
+      case 'sum': return `${RANK[f.o]} + ${RANK[f.t]} makes ${f.sum}.`;
+      case 'suit': return 'Same suit, different rank.';
+      default: return 'Nothing to slap there.';
+    }
+  }
+  function patternText(e) {
+    const v = e.view;
+    switch (e.primary) {
+      case 'double': case 'marriage': return `${v.a} · ${v.t}`;
+      case 'sandwich': case 'run': return `${v.b} · ${v.a} · ${v.t}`;
+      case 'topbottom': return `bottom ${v.bottom} · top ${v.t}`;
+      case 'tens': return `${v.a} + ${v.t}`;
+      default: return '';
+    }
+  }
+
+  /* ---------- Settings and state ---------- */
+  const MODES = [
+    { v: 'live', name: 'Live patterns', note: `Spot patterns the instant they land and keep track of what's buried.` },
+    { v: 'comeback', name: 'Comebacks', note: 'Two players. Win a pile, remember how it ended, then catch it when your own cards bring it back. Uses doubles and sandwiches.' },
+  ];
+  const PACES = [
+    { v: 1200, name: 'Warm-up' },
+    { v: 900, name: 'Normal' },
+    { v: 650, name: 'Quick' },
+    { v: 450, name: 'Cutthroat' },
+  ];
+  const DECKS = [
+    { v: 'drill', name: 'Drill mix', note: 'About 1 card in 3 makes a pattern, and many of the rest are near-misses: a 9 on a 6, an 8 on a 7, a matching suit.' },
+    { v: 'real', name: 'Real deck', note: 'A shuffled 52-card deck with true odds. Patterns are rarer, so the test is staying sharp through the dead stretches.' },
+  ];
+  const DECK_NAME = { drill: 'Drill mix', real: 'Real deck' };
+  const LENGTHS = [10, 20, 40];
+  const PILE_COUNTS = [4, 8, 12];
+  const PACE_MIN = 350, PACE_MAX = 1800, LATE_WINDOW = 450;
+  const DEFAULTS = { mode: 'live', rules: { double: true, sandwich: true, topbottom: true, tens: false, marriage: false, run: false }, pace: 900, adaptive: true, deck: 'drill', memory: true, assist: false, length: 20, piles: 8 };
+  const KEY_SETTINGS = 'ew-trainer.settings.v1', KEY_HISTORY = 'ew-trainer.history.v1';
+
+  function load(key, fallback) { try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch (err) { return fallback; } }
+  function store(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch (err) { /* storage unavailable: carry on without it */ } }
+  function cleanSettings(s) {
+    const out = JSON.parse(JSON.stringify(DEFAULTS));
+    if (!s || typeof s !== 'object') return out;
+    if (MODES.some(m => m.v === s.mode)) out.mode = s.mode;
+    if (s.rules && typeof s.rules === 'object') for (const k of RULES) if (typeof s.rules[k] === 'boolean') out.rules[k] = s.rules[k];
+    if (!RULES.some(k => out.rules[k])) out.rules.double = true;
+    if (PACES.some(p => p.v === s.pace)) out.pace = s.pace;
+    for (const k of ['adaptive', 'memory', 'assist']) if (typeof s[k] === 'boolean') out[k] = s[k];
+    if (DECKS.some(d => d.v === s.deck)) out.deck = s.deck;
+    if (LENGTHS.includes(s.length)) out.length = s.length;
+    if (PILE_COUNTS.includes(s.piles)) out.piles = s.piles;
+    return out;
+  }
+  const num = v => (typeof v === 'number' && isFinite(v) ? Math.round(v) : null);
+  function cleanHistory(list) {
+    if (!Array.isArray(list)) return [];
+    return list.filter(h => h && num(h.at) !== null).map(h => ({
+      at: num(h.at), mode: h.mode === 'comeback' ? 'comeback' : 'live', acc: num(h.acc) || 0, avg: num(h.avg),
+      falses: num(h.falses) || 0, pace: num(h.pace) || 0, deck: h.deck === 'real' ? 'real' : 'drill',
+    })).slice(0, 12);
+  }
+
+  const S = {
+    settings: cleanSettings(load(KEY_SETTINGS, null)),
+    phase: 'idle', // idle | gap | live | recall | lockin | ending | done
+    pile: [], pileCap: 10, top: null, lastMiss: null, recall: null,
+    interval: 900, stats: null, cardsSinceCheck: 0, nextCheck: 9,
+    timer: 0, doneAt: 0, lastSummary: null,
+    history: cleanHistory(load(KEY_HISTORY, [])),
+  };
+
+  function freshStats() {
+    const by = {};
+    for (const k of RULES) by[k] = { seen: 0, hit: 0, late: 0, miss: 0, rts: [] };
+    return { hits: 0, late: 0, miss: 0, falses: 0, falseKinds: {}, rts: [], by, mem: { under: [0, 0], bottom: [0, 0] }, cards: 0 };
+  }
+  const running = () => S.phase !== 'idle' && S.phase !== 'done';
+  const resolvedCount = () => (S.stats ? S.stats.hits + S.stats.late + S.stats.miss : 0);
+  const comebackMode = () => S.settings.mode === 'comeback';
+
+  /* ---------- Drawing ---------- */
+  const $ = id => document.getElementById(id);
+  const felt = $('felt'), pileEl = $('pile'), pileTag = $('pileTag'), assistEl = $('assist');
+  const readout = $('readout'), readoutNum = $('readoutNum'), readoutSub = $('readoutSub'), promptEl = $('prompt');
+  const recallEl = $('recall'), recallQ = $('recallQ'), recallHint = $('recallHint'), ranksEl = $('ranks');
+  const seatThem = $('seatThem'), seatYou = $('seatYou'), chipEl = $('chip');
+  const startBtn = $('startBtn'), stopBtn = $('stopBtn'), settingsFs = $('settings'), lockNote = $('lockNote');
+  const reduceMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const cardLabel = c => RANK[c.rank] + SUIT[c.suit] + TEXT_STYLE;
+  // Phones and tablets get tap wording instead of keyboard hints.
+  const TOUCH = !!(window.matchMedia && window.matchMedia('(hover: none) and (pointer: coarse)').matches);
+  const RECALL_HINT = TOUCH ? '' : 'Keys work too: A, 2 to 9, 0 for 10, J, Q, K.';
+  const START_PROMPT = TOUCH ? 'Tap the table to start' : 'Press <kbd>Space</kbd> or tap the table to start';
+  const AGAIN_PROMPT = TOUCH ? 'Tap the table to go again' : 'Press <kbd>Space</kbd> or tap to go again';
+  const DEAL_ON = TOUCH ? 'Tap the table to deal on.' : 'Press <kbd>Space</kbd> or tap the table to deal on.';
+  function setHint(html) { recallHint.innerHTML = html; recallHint.hidden = !html; }
+
+  function placeVars(el, c) {
+    el.style.setProperty('--rot', c.rot.toFixed(1) + 'deg');
+    el.style.setProperty('--dx', c.dx.toFixed(1) + 'px');
+    el.style.setProperty('--dy', c.dy.toFixed(1) + 'px');
+  }
+  function cardFace(c, drop) {
+    const el = document.createElement('div');
+    el.className = 'card face' + (IS_RED[c.suit] ? ' red' : '') + (c.rank === 10 ? ' ten' : '') + (drop ? ' drop' : '') + (c.owner === 'you' ? ' from-you' : '');
+    placeVars(el, c);
+    const r = RANK[c.rank], s = SUIT[c.suit] + TEXT_STYLE;
+    el.innerHTML = `<span class="idx tl"><b>${r}</b><i>${s}</i></span><span class="mid"><b>${r}</b><i>${s}</i></span><span class="idx br"><b>${r}</b><i>${s}</i></span>`;
+    el.setAttribute('role', 'img');
+    el.setAttribute('aria-label', `${RANK_NAME[c.rank]} of ${SUIT_NAME[c.suit]}`);
+    return el;
+  }
+  function cardEdge(c) {
+    const el = document.createElement('div');
+    el.className = 'card edge';
+    el.setAttribute('aria-hidden', 'true');
+    placeVars(el, c);
+    return el;
+  }
+  function miniCard(c, text) {
+    const el = document.createElement('div');
+    el.className = 'mini' + (IS_RED[c.suit] ? ' red' : '');
+    el.innerHTML = `<span class="mini-label">${text}</span><span class="mini-face"><b>${RANK[c.rank]}</b><i>${SUIT[c.suit]}${TEXT_STYLE}</i></span>`;
+    return el;
+  }
+  function drawPile(cards, drop) {
+    pileEl.textContent = '';
+    const n = cards.length;
+    if (!n) {
+      const spot = document.createElement('div');
+      spot.className = 'spot';
+      spot.setAttribute('aria-hidden', 'true');
+      pileEl.appendChild(spot);
+      return;
+    }
+    for (const c of cards.slice(Math.max(0, n - 4), n - 1)) pileEl.appendChild(cardEdge(c));
+    pileEl.appendChild(cardFace(cards[n - 1], drop && !reduceMotion));
+  }
+  function renderPile(drop) {
+    drawPile(S.pile, drop);
+    const n = S.pile.length;
+    const live = !comebackMode();
+    pileTag.textContent = live && S.settings.rules.topbottom ? 'New pile · remember this card' : 'New pile';
+    pileTag.classList.toggle('on', n === 1 && running());
+    assistEl.hidden = !(live && S.settings.assist && running());
+    if (!assistEl.hidden) {
+      assistEl.textContent = '';
+      assistEl.style.visibility = n >= 2 ? 'visible' : 'hidden';
+      if (n >= 3) assistEl.appendChild(miniCard(S.pile[n - 3], 'Two down'));
+      if (n >= 2) assistEl.appendChild(miniCard(S.pile[n - 2], 'Under'));
+      if (S.settings.rules.topbottom && n >= 4) assistEl.appendChild(miniCard(S.pile[0], 'Bottom'));
+    }
+  }
+  const SAMPLE = [
+    { rank: 4, suit: 2, rot: -6, dx: -5, dy: 3 },
+    { rank: 12, suit: 0, rot: 5, dx: 6, dy: -2 },
+    { rank: 7, suit: 1, rot: -2, dx: 0, dy: 0 },
+  ];
+
+  let fadeTimer = 0;
+  function say(kind, numHtml, sub) {
+    readout.className = 'readout' + (kind ? ' is-' + kind : '');
+    readoutNum.innerHTML = numHtml || '';
+    readoutSub.textContent = sub || '';
+    clearTimeout(fadeTimer);
+    if (kind === 'hit' || kind === 'late' || kind === 'miss' || kind === 'false') {
+      fadeTimer = setTimeout(() => readout.classList.add('fade'), 1400);
+      felt.classList.remove('flash', 'f-hit', 'f-late', 'f-miss', 'f-false');
+      void felt.offsetWidth;
+      felt.classList.add('flash', 'f-' + kind);
+    }
+  }
+  function renderHud() {
+    const cb = comebackMode();
+    $('hudL1').textContent = cb ? 'Piles' : 'Patterns';
+    $('hudL2').textContent = cb ? 'Right calls' : 'Caught';
+    if (cb) {
+      const eps = S.stats && S.stats.cb ? S.stats.cb.eps : [];
+      $('hudPatterns').textContent = `${eps.length} / ${S.settings.piles}`;
+      $('hudCaught').textContent = String(eps.filter(e => e.outcome === 'caught' || e.outcome === 'held').length);
+    } else {
+      $('hudPatterns').textContent = `${resolvedCount()} / ${S.settings.length}`;
+      $('hudCaught').textContent = String(S.stats ? S.stats.hits : 0);
+    }
+    $('hudFalse').textContent = String(S.stats ? S.stats.falses : 0);
+    $('hudPace').textContent = `${Math.round(S.phase === 'idle' ? S.settings.pace : S.interval)} ms`;
+  }
+  function renderSeats() {
+    const on = comebackMode() && running();
+    seatThem.hidden = seatYou.hidden = !on;
+    if (!on) { chipEl.hidden = true; return; }
+    const top = S.pile[S.pile.length - 1];
+    seatThem.classList.toggle('on', !!top && top.owner === 'them');
+    seatYou.classList.toggle('on', !!top && top.owner === 'you');
+    const ch = CB.challenge;
+    chipEl.hidden = !ch;
+    if (ch) {
+      const face = RANK[ch.rank];
+      chipEl.textContent = ch.by === 'them'
+        ? (ch.left > 0 ? `Their ${face}: you have ${ch.left} ${ch.left === 1 ? 'try' : 'tries'}` : `Their ${face}: you're out of tries`)
+        : (ch.left > 0 ? `Your ${face}: they have ${ch.left} ${ch.left === 1 ? 'try' : 'tries'}` : `Your ${face}: they're out of tries`);
+    }
+  }
+
+  /* ---------- A round: shared start, live drill ---------- */
+  function start() {
+    if (running()) return;
+    clearTimeout(S.timer);
+    const cb = comebackMode();
+    S.stats = freshStats();
+    S.interval = S.settings.pace;
+    S.pile = []; S.top = null; S.lastMiss = null; S.recall = null;
+    S.phase = 'gap';
+    settingsFs.disabled = true; lockNote.hidden = false;
+    startBtn.hidden = true; stopBtn.hidden = false;
+    promptEl.hidden = true; recallEl.hidden = true;
+    felt.classList.add('live');
+    felt.classList.toggle('cb', cb);
+    felt.focus({ preventScroll: true });
+    if (window.matchMedia && window.matchMedia('(max-width: 880px)').matches) felt.scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' });
+    if (cb) {
+      S.stats.cb = { eps: [], lock: [0, 0], liveHit: 0, liveLate: 0, liveMiss: 0, liveRts: [] };
+      CB.turn = 'them'; CB.challenge = null; CB.collectBy = null;
+      cbNewEpisode();
+      say('', '', 'Win a pile first by slapping its pattern.');
+    } else {
+      S.pileCap = randInt(7, 16);
+      S.cardsSinceCheck = 0; S.nextCheck = randInt(7, 12);
+      say('', '', 'Eyes on the pile.');
+    }
+    renderPile(false);
+    renderSeats();
+    renderHud();
+    S.timer = setTimeout(() => { if (S.phase === 'gap') { S.phase = 'live'; if (cb) cbPlay(); else placeCard(); } }, 900);
+  }
+
+  function placeCard() {
+    const rules = S.settings.rules;
+    const card = S.settings.deck === 'real' ? realCard() : drillCard(S.pile, rules);
+    S.pile.push(card);
+    const n = S.pile.length;
+    const primary = patternsOf(S.pile, rules)[0] || null;
+    const entry = {
+      primary, shownAt: 0, resolved: false,
+      view: { t: RANK[card.rank], a: n >= 2 ? RANK[S.pile[n - 2].rank] : '', b: n >= 3 ? RANK[S.pile[n - 3].rank] : '', bottom: RANK[S.pile[0].rank] },
+    };
+    S.top = entry;
+    S.stats.cards++;
+    S.cardsSinceCheck++;
+    if (primary) S.stats.by[primary].seen++;
+    requestAnimationFrame(() => {
+      if (S.top !== entry || S.phase !== 'live') return;
+      renderPile(true);
+      entry.shownAt = performance.now();
+      S.timer = setTimeout(tick, S.interval);
+    });
+  }
+
+  // The current card's window has closed.
+  function tick() {
+    if (S.phase !== 'live') return;
+    const e = S.top;
+    let justMissed = false;
+    if (e && e.primary && !e.resolved) {
+      e.resolved = true;
+      justMissed = true;
+      S.stats.miss++; S.stats.by[e.primary].miss++;
+      S.lastMiss = { entry: e, coveredAt: performance.now(), converted: false };
+      if (S.settings.adaptive) S.interval = Math.min(PACE_MAX, S.interval * 1.1);
+      say('miss', 'Missed', `${RULE_NAME[e.primary]}: ${patternText(e)}`);
+      renderHud();
+      if (resolvedCount() >= S.settings.length) { finishSoon(LATE_WINDOW + 50); return; }
+    }
+    if (!justMissed && S.settings.memory && !S.settings.assist && S.cardsSinceCheck >= S.nextCheck && S.pile.length >= 3) { openRecall(); return; }
+    if (S.pile.length >= S.pileCap) { clearPile(justMissed ? '' : 'Pile cleared. Fresh pile coming.', 700); return; }
+    placeCard();
+  }
+
+  function slap(t) {
+    if (S.phase === 'idle') { start(); return; }
+    if (S.phase === 'done') { if (performance.now() - S.doneAt > 900) start(); return; }
+    if (comebackMode()) { cbSlap(t); return; }
+    if (S.phase === 'recall') return;
+    const e = S.top;
+    if (S.phase === 'live' && e && e.primary && !e.resolved && e.shownAt && t >= e.shownAt) {
+      const rt = t - e.shownAt;
+      e.resolved = true;
+      clearTimeout(S.timer);
+      S.stats.hits++; S.stats.rts.push(rt);
+      const b = S.stats.by[e.primary]; b.hit++; b.rts.push(rt);
+      if (S.settings.adaptive) S.interval = Math.max(PACE_MIN, S.interval * 0.95);
+      say('hit', `${Math.round(rt)}<small>ms</small>`, `${RULE_NAME[e.primary]}: ${patternText(e)}`);
+      renderHud();
+      if (resolvedCount() >= S.settings.length) { finishSoon(800); return; }
+      clearPile('', 750);
+      return;
+    }
+    const lm = S.lastMiss;
+    if (lm && !lm.converted && t - lm.coveredAt < LATE_WINDOW) {
+      lm.converted = true;
+      S.stats.miss--; S.stats.late++;
+      const b = S.stats.by[lm.entry.primary]; b.miss--; b.late++;
+      const by = Math.max(1, Math.round(t - lm.coveredAt));
+      say('late', `+${by}<small>ms late</small>`, `${RULE_NAME[lm.entry.primary]}: ${patternText(lm.entry)}. The next card had already landed.`);
+      renderHud();
+      return;
+    }
+    if (S.phase !== 'live') return; // between piles or wrapping up: ignore stray taps
+    S.stats.falses++;
+    const f = falseKind(S.pile, S.settings.rules);
+    S.stats.falseKinds[f.kind] = (S.stats.falseKinds[f.kind] || 0) + 1;
+    if (S.settings.adaptive) S.interval = Math.min(PACE_MAX, S.interval * 1.03);
+    say('false', 'Burn', 'False slap. ' + falseText(f));
+    renderHud();
+  }
+
+  function clearPile(msg, delay) {
+    S.phase = 'gap';
+    clearTimeout(S.timer);
+    S.pile = []; S.top = null;
+    S.pileCap = randInt(7, 16);
+    renderPile(false);
+    if (msg) say('', '', msg);
+    S.timer = setTimeout(() => { if (S.phase === 'gap') { S.phase = 'live'; placeCard(); } }, delay);
+  }
+
+  function resetRanks() {
+    for (const b of ranksEl.children) { b.disabled = false; b.classList.remove('right', 'wrong'); }
+  }
+  function markRanks(right, chosen) {
+    for (const b of ranksEl.children) {
+      const r = Number(b.dataset.rank);
+      b.disabled = true;
+      if (r === right) b.classList.add('right');
+      else if (r === chosen) b.classList.add('wrong');
+    }
+  }
+
+  function openRecall() {
+    S.phase = 'recall';
+    S.cardsSinceCheck = 0; S.nextCheck = randInt(7, 12);
+    const n = S.pile.length;
+    const kinds = ['under'];
+    if (S.settings.rules.topbottom && n >= 4) kinds.push('bottom');
+    const kind = pick(kinds);
+    S.recall = { kind, card: kind === 'under' ? S.pile[n - 2] : S.pile[0], done: false };
+    recallQ.textContent = kind === 'under' ? 'Memory check: what rank is under the top card?' : 'Memory check: what rank started this pile?';
+    setHint(RECALL_HINT);
+    resetRanks();
+    say('', '', '');
+    recallEl.hidden = false;
+  }
+
+  function answerRecall(rank) {
+    if (S.phase !== 'recall' || !S.recall || S.recall.done) return;
+    const { kind, card } = S.recall;
+    S.recall.done = true;
+    const ok = rank === card.rank;
+    S.stats.mem[kind][1]++;
+    if (ok) S.stats.mem[kind][0]++;
+    markRanks(card.rank, rank);
+    recallQ.textContent = ok ? `Right, it was the ${cardLabel(card)}.` : `It was the ${cardLabel(card)}.`;
+    S.timer = setTimeout(() => {
+      if (S.phase !== 'recall') return;
+      recallEl.hidden = true;
+      S.recall = null;
+      S.phase = 'live';
+      felt.focus({ preventScroll: true });
+      placeCard();
+    }, ok ? 700 : 1500);
+  }
+
+  function finishSoon(delay) {
+    S.phase = 'ending';
+    clearTimeout(S.timer);
+    S.timer = setTimeout(finish, delay);
+  }
+
+  function endUi() {
+    settingsFs.disabled = false; lockNote.hidden = true;
+    startBtn.hidden = false; stopBtn.hidden = true;
+    felt.classList.remove('live', 'cb');
+    recallEl.hidden = true;
+    setHint(RECALL_HINT);
+    assistEl.hidden = true;
+    pileTag.classList.remove('on');
+    renderSeats();
+  }
+
+  function finish() {
+    if (S.phase !== 'ending') return;
+    S.phase = 'done';
+    S.doneAt = performance.now();
+    const cb = comebackMode();
+    const sum = cb ? summarizeCB() : summarize();
+    S.lastSummary = sum;
+    S.history.unshift(cb
+      ? { at: sum.at, mode: 'comeback', acc: sum.acc, avg: sum.avg, falses: sum.falses, pace: sum.pace, deck: 'drill' }
+      : { at: sum.at, mode: 'live', acc: sum.acc, avg: sum.avg, falses: sum.falses, pace: sum.paceEnd, deck: sum.deck });
+    S.history = S.history.slice(0, 12);
+    store(KEY_HISTORY, S.history);
+    endUi();
+    if (cb) renderResultsCB(sum); else renderResults(sum);
+    renderHistory();
+    if (cb) {
+      const right = sum.caught + sum.held;
+      say('done', `${right}<small>of ${sum.eps.length} right</small>`, sum.avg === null
+        ? 'No comebacks caught this round.'
+        : `${sum.avg} ms on comebacks` + (sum.liveAvg === null ? '' : ` · ${sum.liveAvg} ms on live patterns`));
+    } else {
+      const falses = `${sum.falses} false slap${sum.falses === 1 ? '' : 's'}`;
+      say('done', `${sum.acc}<small>% caught</small>`, sum.avg === null ? `No catches this round · ${falses}` : `${sum.avg} ms average · ${falses}`);
+    }
+    promptEl.innerHTML = AGAIN_PROMPT;
+    promptEl.hidden = false;
+    renderHud();
+  }
+
+  function stop(message) {
+    if (!running()) return;
+    clearTimeout(S.timer);
+    S.phase = 'idle';
+    S.pile = []; S.top = null; S.recall = null; S.lastMiss = null; S.stats = null;
+    CB.challenge = null; CB.collectBy = null;
+    endUi();
+    drawPile(SAMPLE, false);
+    say('', '', message || 'Round stopped. Nothing was saved.');
+    promptEl.innerHTML = START_PROMPT;
+    promptEl.hidden = false;
+    renderHud();
+  }
+
+  /* ---------- Comeback drill: two players, your won piles come back ---------- */
+  const CB_RULES = { double: true, sandwich: true };
+  const FACE_COUNT = { 1: 4, 11: 1, 12: 2, 13: 3 };
+  const isFace = r => r === 1 || r >= 11;
+  const otherSide = p => (p === 'you' ? 'them' : 'you');
+  const OUTCOME_NAME = { caught: 'Caught', late: 'Late', missed: 'Missed', held: 'Held', falsehold: 'Slapped it' };
+  const CB = { turn: 'them', challenge: null, collectBy: null, ep: null };
+
+  // The pile you'll win: neutral cards, then the cue, then the pattern.
+  function makeWinScript(kind) {
+    const len = randInt(5, 8);
+    const P = randInt(2, 10);
+    let M = 0;
+    if (kind === 'sandwich') do { M = randInt(2, 10); } while (M === P);
+    let cue;
+    do { cue = randInt(2, 10); } while (cue === P || cue === M);
+    const tail = kind === 'double' ? [cue, P, P] : [cue, P, M, P];
+    const head = [];
+    while (head.length < len - tail.length) {
+      const r = randInt(2, 10);
+      if (r === P || r === M || r === cue || r === head[head.length - 1] || r === head[head.length - 2]) continue;
+      head.push(r);
+    }
+    return { ranks: head.concat(tail), P, M, cue };
+  }
+
+  function cbNewEpisode() {
+    const kind = Math.random() < 0.6 ? 'double' : 'sandwich';
+    const shape = Math.random() < (kind === 'double' ? 0.4 : 0.5) ? 'run' : 'alternate';
+    const s = makeWinScript(kind);
+    CB.ep = {
+      kind, shape, P: s.P, M: s.M, cue: s.cue, script: s.ranks, pos: 0, stage: 'win',
+      packet: null, F: 0, played: 0, cueIdx: Infinity, lastIdx: Infinity,
+      face: 0, runFaceDone: false, moment: null,
+      outcome: null, rt: null, lockOk: null, lockAnswered: false, closed: false,
+    };
+  }
+  function cbRetryWin() {
+    const ep = CB.ep;
+    const s = makeWinScript(ep.kind);
+    Object.assign(ep, { P: s.P, M: s.M, cue: s.cue, script: s.ranks, pos: 0 });
+  }
+
+  const mk = (rank, owner, extra) => Object.assign(newCard(rank), { owner }, extra || {});
+  // Rank of your next card when it's one you already know (from your won pile).
+  function peekYou() {
+    const ep = CB.ep, q = ep.played;
+    if (ep.packet && q >= ep.F && q < ep.F + ep.packet.length) return ep.packet[q - ep.F].rank;
+    return null;
+  }
+  // A card that makes no pattern on the pile and doesn't set one up with your next card.
+  function cbNeutral(owner, avoid, wantFace, nextYou) {
+    const pool = wantFace ? [1, 11, 12, 13] : [2, 3, 4, 5, 6, 7, 8, 9, 10];
+    for (const r of shuffle(pool.filter(x => !(avoid && avoid.has(x)) && x !== nextYou))) {
+      const c = mk(r, owner);
+      if (!completes(S.pile, c, CB_RULES)) return c;
+    }
+    if (wantFace) return cbNeutral(owner, avoid, false, nextYou);
+    for (let r = 2; r <= 10; r++) { const c = mk(r, owner); if (r !== nextYou && !completes(S.pile, c, CB_RULES)) return c; }
+    return mk(randInt(2, 10), owner);
+  }
+  function cbYouCard() {
+    const ep = CB.ep;
+    const q = ep.played++;
+    if (ep.packet && q >= ep.F && q < ep.F + ep.packet.length) {
+      const src = ep.packet[q - ep.F];
+      return mk(src.rank, 'you', { suit: src.suit, cue: q === ep.cueIdx, last: q === ep.lastIdx });
+    }
+    const avoid = new Set([ep.cue, ep.P, ep.M]);
+    if (ep.packet && q < ep.F && q >= ep.F - 2) { avoid.add(ep.packet[0].rank); if (ep.packet[1]) avoid.add(ep.packet[1].rank); }
+    const wantFace = !!ep.packet && q < ep.F && ep.cueIdx - q > 4 && Math.random() < 0.2;
+    return cbNeutral('you', avoid, wantFace, null);
+  }
+  function cbBotCard() {
+    const ep = CB.ep, pile = S.pile, top = pile[pile.length - 1];
+    const nextYou = peekYou();
+    const open = ep.stage === 'play' && ep.outcome === null;
+    const toCue = ep.cueIdx - ep.played;
+    // The planned face card right after your cue: you'll have to answer back-to-back.
+    if (open && ep.shape === 'run' && !ep.runFaceDone && top && top.cue) {
+      ep.runFaceDone = true;
+      ep.face = pick(ep.kind === 'double' ? [12, 13, 1] : [13, 1]);
+      return mk(ep.face, 'them');
+    }
+    const quiet = open && toCue <= 4;
+    if (!quiet) {
+      const answering = CB.challenge && CB.challenge.by === 'you';
+      if (!answering && pile.length >= 2 && Math.random() < 0.1) {
+        const target = Math.random() < 0.6 ? top.rank : pile[pile.length - 2].rank;
+        if (!isFace(target)) return mk(target, 'them');
+      }
+      if (Math.random() < 0.16) {
+        const c = cbNeutral('them', null, true, nextYou);
+        if (isFace(c.rank) && toCue - FACE_COUNT[c.rank] > 4) return c;
+      }
+    }
+    return cbNeutral('them', null, false, nextYou);
+  }
+  function cbDraw(player) {
+    const ep = CB.ep;
+    if (ep.stage === 'win') {
+      const r = ep.script[ep.pos++];
+      return mk(r, player, ep.pos === ep.script.length ? { winEnd: true } : null);
+    }
+    return player === 'you' ? cbYouCard() : cbBotCard();
+  }
+
+  function cbPlay() {
+    const ep = CB.ep;
+    const player = CB.challenge ? otherSide(CB.challenge.by) : CB.turn;
+    const card = cbDraw(player);
+    S.pile.push(card);
+    const ch = CB.challenge;
+    if (isFace(card.rank)) CB.challenge = { by: player, left: FACE_COUNT[card.rank], rank: card.rank };
+    else if (ch) { ch.left--; if (ch.left <= 0) CB.collectBy = ch.by; }
+    else CB.turn = otherSide(player);
+    const n = S.pile.length;
+    const primary = patternsOf(S.pile, CB_RULES)[0] || null;
+    const entry = {
+      primary, owner: player, shownAt: 0, resolved: false,
+      view: { t: RANK[card.rank], a: n >= 2 ? RANK[S.pile[n - 2].rank] : '', b: n >= 3 ? RANK[S.pile[n - 3].rank] : '', bottom: RANK[S.pile[0].rank] },
+      win: ep.stage === 'win' && !!card.winEnd, comeback: false, hold: false,
+    };
+    if (ep.stage === 'play' && card.last && ep.outcome === null) {
+      ep.moment = S.pile.slice(-5).map(c => RANK[c.rank]);
+      if (primary) entry.comeback = true; else entry.hold = true;
+    }
+    S.top = entry;
+    S.stats.cards++;
+    requestAnimationFrame(() => {
+      if (S.top !== entry || S.phase !== 'live') return;
+      renderPile(true);
+      renderSeats();
+      entry.shownAt = performance.now();
+      S.timer = setTimeout(cbTick, S.interval);
+    });
+  }
+
+  function cbClearPile(winner) {
+    clearTimeout(S.timer);
+    S.pile = []; S.top = null;
+    CB.challenge = null; CB.collectBy = null;
+    if (winner) CB.turn = winner;
+    renderPile(false);
+    renderSeats();
+  }
+  function cbContinue(delay) {
+    S.phase = 'gap';
+    S.timer = setTimeout(() => { if (S.phase === 'gap') { S.phase = 'live'; cbPlay(); } }, delay);
+  }
+
+  const kindLabel = ep => (ep.kind === 'double' ? `${RANK[ep.P]} · ${RANK[ep.P]}` : `${RANK[ep.P]} · ${RANK[ep.M]} · ${RANK[ep.P]}`);
+  function shapeText(ep) {
+    const m = ep.moment || [];
+    if (ep.shape === 'run') return `${(ep.kind === 'double' ? m.slice(-2) : m.slice(-3)).join(' · ')}, back-to-back on their ${RANK[ep.face]}`;
+    return (ep.kind === 'double' ? m.slice(-3) : m.slice(-5)).join(' · ');
+  }
+  function cameBackAs(ep) {
+    if (ep.kind === 'double') return ep.shape === 'run' ? `Double, on their ${RANK[ep.face]}` : `Sandwich, ${shapeText(ep)}`;
+    return ep.shape === 'run' ? `Sandwich, on their ${RANK[ep.face]}` : `Split up, ${shapeText(ep)}`;
+  }
+
+  function cbTick() {
+    if (S.phase !== 'live') return;
+    const ep = CB.ep, e = S.top;
+    if (e && !e.resolved && e.primary) {
+      // A pattern went unslapped, so they take it.
+      e.resolved = true;
+      S.lastMiss = { entry: e, ep, coveredAt: performance.now(), converted: false };
+      if (e.comeback) {
+        ep.outcome = 'missed';
+        say('miss', 'Missed', `Your ${kindLabel(ep)} came back as ${shapeText(ep)}. They slapped it.`);
+        cbClearPile('them');
+        cbEndEpisode();
+        return;
+      }
+      S.stats.cb.liveMiss++;
+      say('miss', 'Missed', `${RULE_NAME[e.primary]}: ${patternText(e)}. They slapped it.`);
+      renderHud();
+      cbClearPile('them');
+      if (e.win) cbRetryWin();
+      cbContinue(900);
+      return;
+    }
+    if (e && !e.resolved && e.hold) {
+      e.resolved = true;
+      ep.outcome = 'held';
+      say('hit', 'Held', `Right call. Your ${kindLabel(ep)} came back split up as ${shapeText(ep)}.`);
+      cbClearPile('them');
+      cbEndEpisode();
+      return;
+    }
+    if (ep.stage === 'play' && ep.outcome && !ep.closed) { cbClearPile('them'); cbEndEpisode(); return; }
+    if (CB.collectBy) {
+      const w = CB.collectBy;
+      say('', '', w === 'you' ? 'They ran out of tries. The pile is yours.' : 'You ran out of tries. They take the pile.');
+      cbClearPile(w);
+      cbContinue(700);
+      return;
+    }
+    cbPlay();
+  }
+
+  function cbSlap(t) {
+    if (S.phase === 'lockin') { cbLeaveLockin(); return; }
+    const ep = CB.ep, e = S.top;
+    if (S.phase === 'live' && e && e.primary && !e.resolved && e.shownAt && t >= e.shownAt) {
+      const rt = t - e.shownAt;
+      e.resolved = true;
+      clearTimeout(S.timer);
+      if (e.comeback) {
+        ep.outcome = 'caught'; ep.rt = rt;
+        say('hit', `${Math.round(rt)}<small>ms</small>`, `Comeback. Your ${kindLabel(ep)} landed as ${shapeText(ep)}.`);
+        cbClearPile('you');
+        cbEndEpisode();
+        return;
+      }
+      S.stats.cb.liveHit++;
+      S.stats.cb.liveRts.push(rt);
+      if (e.win) {
+        say('hit', `${Math.round(rt)}<small>ms</small>`, `${RULE_NAME[e.primary]}: ${patternText(e)}. The pile is yours.`);
+        ep.packet = S.pile.map(c => ({ rank: c.rank, suit: c.suit }));
+        ep.F = randInt(2, 6);
+        ep.played = 0;
+        ep.cueIdx = ep.F + ep.packet.length - (ep.kind === 'double' ? 3 : 4);
+        ep.lastIdx = ep.F + ep.packet.length - 1;
+        cbClearPile('you');
+        S.phase = 'gap';
+        S.timer = setTimeout(() => { if (S.phase === 'gap') cbOpenLockin(); }, 700);
+        return;
+      }
+      say('hit', `${Math.round(rt)}<small>ms</small>`, `${RULE_NAME[e.primary]}: ${patternText(e)}. The pile is yours.`);
+      cbClearPile('you');
+      cbContinue(750);
+      return;
+    }
+    const lm = S.lastMiss;
+    if (lm && !lm.converted && t - lm.coveredAt < LATE_WINDOW) {
+      lm.converted = true;
+      const le = lm.entry, by = Math.max(1, Math.round(t - lm.coveredAt));
+      if (le.comeback) {
+        lm.ep.outcome = 'late';
+        lm.ep.rt = t - le.shownAt;
+        say('late', `+${by}<small>ms late</small>`, `Your comeback ${shapeText(lm.ep)} was already covered.`);
+      } else {
+        S.stats.cb.liveMiss--; S.stats.cb.liveLate++;
+        say('late', `+${by}<small>ms late</small>`, `${RULE_NAME[le.primary]}: ${patternText(le)}. They got there first.`);
+      }
+      renderHud();
+      return;
+    }
+    if (S.phase !== 'live') return;
+    S.stats.falses++;
+    if (e && e.hold && !e.resolved) {
+      e.resolved = true;
+      ep.outcome = 'falsehold';
+      say('false', 'Burn', `Your ${kindLabel(ep)} came back split up as ${shapeText(ep)}. It only lands whole when you play back-to-back.`);
+      renderHud();
+      return;
+    }
+    const f = falseKind(S.pile, CB_RULES);
+    S.stats.falseKinds[f.kind] = (S.stats.falseKinds[f.kind] || 0) + 1;
+    say('false', 'Burn', 'False slap. ' + falseText(f));
+    renderHud();
+  }
+
+  function cbOpenLockin() {
+    const ep = CB.ep;
+    S.phase = 'lockin';
+    ep.stage = 'lockin';
+    recallQ.textContent = `You won ${ep.packet.length} cards. Lock it in. What rank landed right before the ${kindLabel(ep)}?`;
+    setHint(RECALL_HINT);
+    resetRanks();
+    recallEl.hidden = false;
+  }
+  function cbAnswerLockin(rank) {
+    const ep = CB.ep;
+    if (S.phase !== 'lockin' || ep.lockAnswered) return;
+    ep.lockAnswered = true;
+    ep.lockOk = rank === ep.cue;
+    S.stats.cb.lock[1]++;
+    if (ep.lockOk) S.stats.cb.lock[0]++;
+    markRanks(ep.cue, rank);
+    recallQ.textContent = `${ep.lockOk ? 'Right.' : `It was a ${RANK[ep.cue]}.`} Your plan: after your ${RANK[ep.cue]}, your next cards are ${kindLabel(ep)}. They sit under about ${ep.F} of your cards.`;
+    setHint(DEAL_ON);
+  }
+  function cbLeaveLockin() {
+    const ep = CB.ep;
+    if (S.phase !== 'lockin' || !ep.lockAnswered) return;
+    recallEl.hidden = true;
+    setHint(RECALL_HINT);
+    ep.stage = 'play';
+    say('', '', 'Watch for your cue.');
+    felt.focus({ preventScroll: true });
+    cbContinue(500);
+  }
+
+  function cbEndEpisode() {
+    const ep = CB.ep;
+    ep.closed = true;
+    S.stats.cb.eps.push(ep);
+    renderHud();
+    if (S.stats.cb.eps.length >= S.settings.piles) { finishSoon(LATE_WINDOW + 400); return; }
+    cbNewEpisode();
+    cbContinue(1600);
+  }
+
+  /* ---------- Results ---------- */
+  const mean = a => a.reduce((s, x) => s + x, 0) / a.length;
+  const median = a => { const s = a.slice().sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+
+  function summarize() {
+    const st = S.stats, set = S.settings;
+    const resolved = st.hits + st.late + st.miss;
+    const rows = RULES.filter(k => st.by[k].seen > 0).map(k => {
+      const b = st.by[k];
+      return { key: k, seen: b.seen, hit: b.hit, late: b.late, miss: b.miss, avg: b.rts.length ? Math.round(mean(b.rts)) : null };
+    });
+    return {
+      mode: 'live', at: Date.now(), resolved,
+      acc: resolved ? Math.round(100 * st.hits / resolved) : 0,
+      avg: st.rts.length ? Math.round(mean(st.rts)) : null,
+      median: st.rts.length ? Math.round(median(st.rts)) : null,
+      best: st.rts.length ? Math.round(Math.min(...st.rts)) : null,
+      hits: st.hits, late: st.late, miss: st.miss, falses: st.falses, falseKinds: st.falseKinds,
+      rows, memOn: set.memory && !set.assist, mem: st.mem,
+      memRight: st.mem.under[0] + st.mem.bottom[0], memTotal: st.mem.under[1] + st.mem.bottom[1],
+      paceStart: set.pace, paceEnd: Math.round(S.interval), adaptive: set.adaptive, deck: set.deck,
+      rules: RULES.filter(k => set.rules[k]), cards: st.cards,
+    };
+  }
+
+  function coach(sum) {
+    const tips = [];
+    const row = Object.fromEntries(sum.rows.map(r => [r.key, r]));
+    if (sum.falses >= 3 && sum.falses >= sum.hits * 0.25) {
+      const top = Object.entries(sum.falseKinds || {}).sort((a, b) => b[1] - a[1])[0];
+      const lines = {
+        oneoff: 'Most came on cards one rank off, like an 8 on a 7. Read the rank before you move.',
+        lookalike: 'Look-alike ranks are catching you, like 6 and 9 or 3 and 8. Check the corner index before you move.',
+        face: 'Face cards are blurring together. Say the letter in your head as each one lands.',
+        sum: 'Near-tens are catching you, like a 4 then a 7. Finish the sum before you move.',
+        suit: 'You are reacting to matching suits. Only ranks count for these rules.',
+        other: 'Several came with nothing close on the table. Try one pace slower until every slap is a sure thing.',
+      };
+      tips.push(['false', `${sum.falses} false slaps. ${lines[top ? top[0] : 'other'] || lines.other}`]);
+    }
+    const d = row.double, s = row.sandwich;
+    if (d && s && d.avg !== null && s.avg !== null && d.hit >= 2 && s.hit >= 2 && s.avg - d.avg >= 60) {
+      tips.push(['mem', `Sandwiches took ${s.avg - d.avg} ms longer than doubles. That gap is the memory part. Say the last two ranks to yourself as they land ("seven, four") so the check two cards back is instant.`]);
+    }
+    const tb = row.topbottom;
+    if (tb && tb.seen >= 2 && tb.hit / tb.seen < 0.6) tips.push(['mem', `You caught ${tb.hit} of ${tb.seen} top-bottoms. Lock in the first card of every new pile and keep it running in the background.`]);
+    if (sum.late >= 2) tips.push(['late', `${sum.late} slaps landed just after the next card. You saw the pattern and hesitated. Go as soon as the ranks match.`]);
+    if (sum.miss >= 3 && sum.acc < 70) tips.push(['miss', `You missed ${sum.miss} patterns outright. Drop one pace step and build back up.`]);
+    if (sum.memOn && sum.memTotal >= 3 && sum.memRight / sum.memTotal < 0.7) tips.push(['mem', `Memory checks: ${sum.memRight} of ${sum.memTotal}. The card under the top matters most, since every sandwich depends on it.`]);
+    if (!tips.length) {
+      if (sum.acc >= 90 && sum.falses <= 1) tips.push(['good', sum.adaptive ? `Clean round. You finished at ${sum.paceEnd} ms per card. Start the next round one pace faster, or add a house rule.` : 'Clean round. Go one pace faster, or add a house rule.']);
+      else tips.push(['good', 'Solid round. Run it again at the same pace and try to beat your average.']);
+    }
+    return tips.slice(0, 3);
+  }
+
+  function level(el, cls) {
+    el.classList.remove('lvl-good', 'lvl-mid', 'lvl-low');
+    if (cls) el.classList.add('lvl-' + cls);
+  }
+  function fillCoach(tips) {
+    const list = $('rCoach');
+    list.textContent = '';
+    for (const [cls, text] of tips) {
+      const li = document.createElement('li');
+      li.className = cls;
+      li.textContent = text;
+      list.appendChild(li);
+    }
+  }
+
+  function renderResults(sum) {
+    $('results').hidden = false;
+    const ruleNames = sum.rules.map(k => (RULE_UI.find(r => r.key === k) || { name: k }).name).join(', ');
+    const pace = sum.adaptive && sum.paceEnd !== sum.paceStart ? `${sum.paceStart} → ${sum.paceEnd} ms` : `${sum.paceStart} ms`;
+    $('resultsMeta').textContent = `${DECK_NAME[sum.deck] || 'Drill mix'} · ${ruleNames} · pace ${pace}`;
+
+    $('tAvgL').textContent = 'Average reaction';
+    $('rAvg').innerHTML = sum.avg === null ? '–' : `${sum.avg}<small>ms</small>`;
+    $('rAvgSub').textContent = sum.avg === null ? 'No catches' : `Fastest ${sum.best} · median ${sum.median}`;
+    level($('tileAvg'), sum.avg === null ? 'low' : sum.avg < 450 ? 'good' : sum.avg < 600 ? 'mid' : 'low');
+
+    $('tAccL').textContent = 'Patterns caught';
+    $('rAcc').innerHTML = `${sum.acc}<small>%</small>`;
+    $('rAccSub').textContent = `${sum.hits} of ${sum.resolved}` + (sum.late ? ` · ${sum.late} late` : '') + (sum.miss ? ` · ${sum.miss} missed` : '');
+    level($('tileAcc'), sum.acc >= 90 ? 'good' : sum.acc >= 70 ? 'mid' : 'low');
+
+    $('tFalseL').textContent = 'False slaps';
+    $('rFalse').textContent = String(sum.falses);
+    $('rFalseSub').textContent = sum.falses ? 'Each one burns a card' : 'Clean';
+    level($('tileFalse'), sum.falses <= 1 ? 'good' : sum.falses <= 3 ? 'mid' : 'low');
+
+    $('tMemL').textContent = 'Memory checks';
+    if (sum.memOn && sum.memTotal) {
+      const pct = sum.memRight / sum.memTotal;
+      const u = sum.mem.under, b = sum.mem.bottom;
+      $('rMem').innerHTML = `${sum.memRight}<small>of ${sum.memTotal}</small>`;
+      $('rMemSub').textContent = `Under the top ${u[0]}/${u[1]}` + (b[1] ? ` · bottom ${b[0]}/${b[1]}` : '');
+      level($('tileMem'), pct >= 0.8 ? 'good' : pct >= 0.6 ? 'mid' : 'low');
+    } else {
+      $('rMem').textContent = '–';
+      $('rMemSub').textContent = sum.memOn ? 'None came up this round' : 'Memory checks are off';
+      level($('tileMem'), '');
+    }
+
+    $('rHead').innerHTML = '<tr><th scope="col">Pattern</th><th scope="col">Caught</th><th scope="col">Late</th><th scope="col">Missed</th><th scope="col">Avg</th></tr>';
+    const maxAvg = Math.max(1, ...sum.rows.map(r => r.avg || 0));
+    const body = $('rRows');
+    body.textContent = '';
+    for (const r of sum.rows) {
+      const tr = document.createElement('tr');
+      const avg = r.avg === null ? '–' : `<span class="avgcell"><span class="bar" style="--w:${(r.avg / maxAvg).toFixed(3)}"></span>${r.avg} ms</span>`;
+      tr.innerHTML = `<th scope="row">${RULE_NAME[r.key]}</th><td>${r.hit} of ${r.seen}</td><td>${r.late || '–'}</td><td>${r.miss || '–'}</td><td>${avg}</td>`;
+      body.appendChild(tr);
+    }
+    fillCoach(coach(sum));
+  }
+
+  function summarizeCB() {
+    const st = S.stats, cb = st.cb;
+    const count = o => cb.eps.filter(e => e.outcome === o).length;
+    const rts = cb.eps.filter(e => e.outcome === 'caught' && typeof e.rt === 'number').map(e => e.rt);
+    const caught = count('caught'), late = count('late'), missed = count('missed'), held = count('held'), falsehold = count('falsehold');
+    return {
+      mode: 'comeback', at: Date.now(),
+      eps: cb.eps.map(e => ({
+        kind: e.kind, shape: e.shape, outcome: e.outcome, lockOk: e.lockOk,
+        rt: typeof e.rt === 'number' ? Math.round(e.rt) : null, pile: kindLabel(e), back: cameBackAs(e),
+      })),
+      caught, late, missed, slapTotal: caught + late + missed, held, holdTotal: held + falsehold,
+      avg: rts.length ? Math.round(mean(rts)) : null,
+      liveAvg: cb.liveRts.length ? Math.round(mean(cb.liveRts)) : null,
+      lockRight: cb.lock[0], lockTotal: cb.lock[1],
+      falses: st.falses, pace: S.settings.pace,
+      acc: cb.eps.length ? Math.round(100 * (caught + held) / cb.eps.length) : 0,
+    };
+  }
+
+  function coachCB(sum) {
+    const tips = [];
+    const eps = sum.eps;
+    const missedBy = (kind, shape) => eps.filter(e => e.kind === kind && e.shape === shape && (e.outcome === 'missed' || e.outcome === 'late')).length;
+    const falseHolds = eps.filter(e => e.outcome === 'falsehold').length;
+    if (falseHolds) tips.push(['false', `You slapped ${falseHolds} split-up sandwich${falseHolds === 1 ? '' : 'es'}. On normal turns their cards land between yours, so a won sandwich comes back broken. It only lands whole when you're answering a face card.`]);
+    if (missedBy('double', 'alternate')) tips.push(['miss', 'On normal turns a won double comes back as a sandwich with their card in the middle. The second card of your pair is the slap.']);
+    if (missedBy('double', 'run') + missedBy('sandwich', 'run')) tips.push(['miss', 'When you answer a face card, your cards land back-to-back, so your pile comes back exactly as you won it. Count your tries and slap the card that completes it.']);
+    if (sum.lockTotal >= 2 && sum.lockRight / sum.lockTotal < 0.7) tips.push(['mem', `Lock-ins: ${sum.lockRight} of ${sum.lockTotal}. Grab the card before the pattern the moment you slap ("after my 3").`]);
+    if (sum.avg !== null && sum.liveAvg !== null) {
+      const gain = sum.liveAvg - sum.avg;
+      if (gain >= 80) tips.push(['good', `Comebacks took you ${sum.avg} ms against ${sum.liveAvg} ms on live patterns. Those ${gain} ms are the edge you get from knowing your next card.`]);
+      else tips.push(['late', `Comebacks took you ${sum.avg} ms, close to your ${sum.liveAvg} ms on live patterns. Once your cue lands you already know which card is the slap, so commit to it as it lands.`]);
+    }
+    if (!tips.length) tips.push(['good', 'Clean round. Try a faster pace next.']);
+    return tips.slice(0, 3);
+  }
+
+  function renderResultsCB(sum) {
+    $('results').hidden = false;
+    $('resultsMeta').textContent = `Comebacks · ${sum.eps.length} piles · pace ${sum.pace} ms · ${sum.falses} false slap${sum.falses === 1 ? '' : 's'}`;
+
+    $('tAvgL').textContent = 'Comeback reaction';
+    $('rAvg').innerHTML = sum.avg === null ? '–' : `${sum.avg}<small>ms</small>`;
+    $('rAvgSub').textContent = sum.liveAvg === null ? 'No live catches to compare' : `Live patterns: ${sum.liveAvg} ms`;
+    const gain = sum.avg !== null && sum.liveAvg !== null ? sum.liveAvg - sum.avg : null;
+    level($('tileAvg'), sum.avg === null ? 'low' : gain === null ? '' : gain >= 80 ? 'good' : gain >= 0 ? 'mid' : 'low');
+
+    $('tAccL').textContent = 'Comebacks caught';
+    $('rAcc').innerHTML = sum.slapTotal ? `${sum.caught}<small>of ${sum.slapTotal}</small>` : '–';
+    $('rAccSub').textContent = !sum.slapTotal ? 'None came up' : ([sum.late ? `${sum.late} late` : '', sum.missed ? `${sum.missed} missed` : ''].filter(Boolean).join(' · ') || 'Every one');
+    const cr = sum.slapTotal ? sum.caught / sum.slapTotal : null;
+    level($('tileAcc'), cr === null ? '' : cr >= 0.9 ? 'good' : cr >= 0.7 ? 'mid' : 'low');
+
+    $('tFalseL').textContent = 'Split-ups held';
+    $('rFalse').innerHTML = sum.holdTotal ? `${sum.held}<small>of ${sum.holdTotal}</small>` : '–';
+    $('rFalseSub').textContent = sum.holdTotal ? 'Won sandwiches that came back broken' : 'None came up this round';
+    level($('tileFalse'), !sum.holdTotal ? '' : sum.held === sum.holdTotal ? 'good' : sum.held / sum.holdTotal >= 0.5 ? 'mid' : 'low');
+
+    $('tMemL').textContent = 'Lock-ins';
+    $('rMem').innerHTML = sum.lockTotal ? `${sum.lockRight}<small>of ${sum.lockTotal}</small>` : '–';
+    $('rMemSub').textContent = 'The card right before the pattern';
+    const lr = sum.lockTotal ? sum.lockRight / sum.lockTotal : null;
+    level($('tileMem'), lr === null ? '' : lr >= 0.8 ? 'good' : lr >= 0.6 ? 'mid' : 'low');
+
+    $('rHead').innerHTML = '<tr><th scope="col">Your pile</th><th scope="col" class="wrap">Came back as</th><th scope="col">Result</th><th scope="col">Time</th></tr>';
+    const body = $('rRows');
+    body.textContent = '';
+    for (const e of sum.eps) {
+      const tr = document.createElement('tr');
+      const cells = [
+        ['th', e.pile, ''],
+        ['td', e.back, 'wrap'],
+        ['td', OUTCOME_NAME[e.outcome] || '–', ''],
+        ['td', e.outcome === 'caught' && e.rt !== null ? `${e.rt} ms` : '–', ''],
+      ];
+      for (const [tag, text, cls] of cells) {
+        const cell = document.createElement(tag);
+        if (tag === 'th') cell.scope = 'row';
+        if (cls) cell.className = cls;
+        cell.textContent = text;
+        tr.appendChild(cell);
+      }
+      body.appendChild(tr);
+    }
+    fillCoach(coachCB(sum));
+  }
+
+  function renderHistory() {
+    const wrap = $('historyWrap'), list = $('history');
+    wrap.hidden = !S.history.length;
+    if (!S.history.length) return;
+    list.textContent = '';
+    const head = document.createElement('li');
+    head.className = 'h-head';
+    head.innerHTML = '<span class="h-when">Round</span><span>Right</span><span>Avg</span><span class="h-false">False</span><span class="h-pace">Pace</span>';
+    list.appendChild(head);
+    let fmt;
+    try { fmt = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); }
+    catch (err) { fmt = { format: d => d.toLocaleString() }; }
+    for (const h of S.history.slice(0, 8)) {
+      const li = document.createElement('li');
+      const when = fmt.format(new Date(h.at)) + (h.mode === 'comeback' ? ' · Comebacks' : '');
+      const cells = [['h-when', when], ['', `${num(h.acc) || 0}%`], ['', num(h.avg) === null ? '–' : `${num(h.avg)} ms`], ['h-false', String(num(h.falses) || 0)], ['h-pace', `${num(h.pace) || 0} ms`]];
+      for (const [cls, text] of cells) {
+        const span = document.createElement('span');
+        if (cls) span.className = cls;
+        span.textContent = text;
+        li.appendChild(span);
+      }
+      list.appendChild(li);
+    }
+    const clean = S.history.filter(h => h.mode !== 'comeback' && h.acc >= 80 && num(h.avg) !== null);
+    $('bestNote').textContent = clean.length
+      ? `Best live average in a round with 80% or more caught: ${Math.min(...clean.map(h => h.avg))} ms.`
+      : 'Catch 80% or more in a live round to set a best average.';
+  }
+
+  /* ---------- Settings panel ---------- */
+  const saveSettings = () => store(KEY_SETTINGS, S.settings);
+  function flashNote(id, text) {
+    const el = $(id);
+    if (!el.dataset.base) el.dataset.base = el.textContent;
+    el.textContent = text;
+    el.classList.add('warn');
+    clearTimeout(el._timer);
+    el._timer = setTimeout(() => { el.textContent = el.dataset.base; el.classList.remove('warn'); }, 2200);
+  }
+  function buildSeg(id, options, key) {
+    const el = $(id);
+    for (const o of options) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.dataset.v = String(o.v);
+      b.innerHTML = o.html;
+      b.addEventListener('click', () => { S.settings[key] = o.v; saveSettings(); syncSettings(); });
+      el.appendChild(b);
+    }
+  }
+  function buildSettings() {
+    const rulesEl = $('rules');
+    for (const r of RULE_UI) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'rule';
+      b.id = 'rule-' + r.key;
+      b.dataset.rule = r.key;
+      b.innerHTML = `<span class="rule-top"><span class="rule-name">${r.name}</span><span class="rule-eg" aria-hidden="true">${r.eg}</span></span><span class="rule-desc">${r.desc}</span>`;
+      b.addEventListener('click', () => {
+        const on = !S.settings.rules[r.key];
+        if (!on && RULES.filter(k => S.settings.rules[k]).length === 1) { flashNote('rulesNote', 'Keep at least one rule on.'); return; }
+        S.settings.rules[r.key] = on;
+        saveSettings();
+        syncSettings();
+      });
+      rulesEl.appendChild(b);
+    }
+    buildSeg('modeSeg', MODES.map(m => ({ v: m.v, html: m.name })), 'mode');
+    buildSeg('paceSeg', PACES.map(p => ({ v: p.v, html: `${p.name}<small>${p.v} ms</small>` })), 'pace');
+    buildSeg('deckSeg', DECKS.map(d => ({ v: d.v, html: d.name })), 'deck');
+    buildSeg('lenSeg', LENGTHS.map(n => ({ v: n, html: `${n}<small>patterns</small>` })), 'length');
+    buildSeg('pilesSeg', PILE_COUNTS.map(n => ({ v: n, html: `${n}<small>piles</small>` })), 'piles');
+    for (const [id, key] of [['adaptive', 'adaptive'], ['memory', 'memory'], ['assistBox', 'assist']]) {
+      $(id).addEventListener('change', ev => { S.settings[key] = ev.target.checked; saveSettings(); syncSettings(); });
+    }
+  }
+  function syncSettings() {
+    for (const b of $('rules').children) b.setAttribute('aria-pressed', String(!!S.settings.rules[b.dataset.rule]));
+    for (const [id, key] of [['modeSeg', 'mode'], ['paceSeg', 'pace'], ['deckSeg', 'deck'], ['lenSeg', 'length'], ['pilesSeg', 'piles']]) {
+      for (const b of $(id).children) b.setAttribute('aria-pressed', String(b.dataset.v === String(S.settings[key])));
+    }
+    $('adaptive').checked = S.settings.adaptive;
+    $('memory').checked = S.settings.memory;
+    $('assistBox').checked = S.settings.assist;
+    $('deckNote').textContent = (DECKS.find(d => d.v === S.settings.deck) || DECKS[0]).note;
+    $('modeNote').textContent = (MODES.find(m => m.v === S.settings.mode) || MODES[0]).note;
+    for (const el of document.querySelectorAll('[data-only]')) el.hidden = el.dataset.only !== S.settings.mode;
+    renderHud();
+  }
+  function buildRanks() {
+    for (let r = 1; r <= 13; r++) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'rank-btn';
+      b.dataset.rank = String(r);
+      b.textContent = RANK[r];
+      b.setAttribute('aria-label', RANK_NAME[r]);
+      b.addEventListener('click', () => { if (S.phase === 'lockin') cbAnswerLockin(r); else answerRecall(r); });
+      ranksEl.appendChild(b);
+    }
+  }
+
+  /* ---------- Input ---------- */
+  function eventTime(ev) {
+    const now = performance.now();
+    const ts = ev && typeof ev.timeStamp === 'number' ? ev.timeStamp : 0;
+    return ts > 0 && ts <= now + 2 && now - ts < 1000 ? ts : now;
+  }
+  function keyRank(key) {
+    const k = String(key).toLowerCase();
+    if (k === 'a') return 1;
+    if (k === '1' || k === '0' || k === 't') return 10;
+    if (k.length === 1 && k >= '2' && k <= '9') return Number(k);
+    return { j: 11, q: 12, k: 13 }[k] || 0;
+  }
+  felt.addEventListener('pointerdown', ev => {
+    if (ev.pointerType === 'mouse' && ev.button !== 0) return;
+    if (ev.target.closest('button, a, input, label')) return;
+    ev.preventDefault();
+    slap(eventTime(ev));
+  });
+  document.addEventListener('keydown', ev => {
+    if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
+    const isSpace = ev.key === ' ' || ev.code === 'Space';
+    if (S.phase === 'recall' || S.phase === 'lockin') {
+      if (ev.key === 'Escape') { ev.preventDefault(); stop(); return; }
+      if (isSpace || ev.key === 'Enter') { ev.preventDefault(); if (!ev.repeat && S.phase === 'lockin') cbLeaveLockin(); return; }
+      if (ev.repeat) return;
+      const r = keyRank(ev.key);
+      if (r) { ev.preventDefault(); if (S.phase === 'lockin') cbAnswerLockin(r); else answerRecall(r); }
+      return;
+    }
+    if (isSpace || (ev.key === 'Enter' && ev.target === felt)) {
+      if (!running() && ev.target !== felt && ev.target.closest && ev.target.closest('button, input, label, a, select, textarea')) return;
+      ev.preventDefault();
+      if (ev.repeat) return;
+      slap(eventTime(ev));
+      return;
+    }
+    if (ev.key === 'Escape' && running()) { ev.preventDefault(); stop(); }
+  });
+  startBtn.addEventListener('click', () => start());
+  stopBtn.addEventListener('click', () => stop());
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && running()) stop('Round stopped because the page was hidden. Nothing was saved.');
+  });
+
+  /* ---------- Boot ---------- */
+  function boot(data) {
+    data = data || {};
+    if (data.settings) S.settings = cleanSettings(data.settings);
+    buildSettings();
+    buildRanks();
+    syncSettings();
+    drawPile(SAMPLE, false);
+    promptEl.innerHTML = START_PROMPT;
+    if (TOUCH) $('keysHint').textContent = 'Tap the table to slap';
+    say('', '', 'Your reaction time shows up here after every catch.');
+    renderHistory();
+    const last = data.last;
+    if (last && typeof last === 'object') {
+      try {
+        if (last.mode === 'comeback' && Array.isArray(last.eps)) { S.lastSummary = last; renderResultsCB(last); }
+        else if (Array.isArray(last.rows)) { S.lastSummary = last; renderResults(last); }
+      } catch (err) { $('results').hidden = true; }
+    }
+    const hot = window.claude && window.claude.hot;
+    if (hot && typeof hot.snapshot === 'function') hot.snapshot(() => ({ settings: S.settings, last: S.lastSummary }));
+  }
+
+  window.ewt = { patternsOf, targetCard, lureCard, neutralCard, drillCard, falseKind, isRun, makeWinScript, S, CB };
+  const hot = window.claude && window.claude.hot;
+  if (hot && typeof hot.ready === 'function') hot.ready(boot);
+  else boot((hot && hot.data) || {});
+})();
+</script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+  }
+</script>
+</body>
+</html>
