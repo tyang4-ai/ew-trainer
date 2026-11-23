@@ -99,6 +99,18 @@ button { font: inherit; color: inherit; }
 .seat-you { bottom: 14px; }
 .chip { position: absolute; top: 11px; right: 14px; z-index: 2; padding: 4px 10px; border-radius: 999px; border: 1px solid rgba(246, 239, 226, .4); background: rgba(246, 239, 226, .08); color: var(--stock); font-weight: 700; font-size: .76rem; font-stretch: 85%; }
 
+/* Fake flinch: a hand darts in from the edge toward the pile and back */
+.hand { position: absolute; left: 50%; top: 50%; z-index: 2; width: 64px; height: 96px; margin: -48px 0 0 -32px; pointer-events: none; opacity: 0; filter: drop-shadow(0 8px 14px rgba(0, 0, 0, .45)); }
+.hand svg { display: block; width: 100%; height: 100%; }
+.hand .palm { fill: var(--stock); }
+.hand .cuff { fill: var(--rule); }
+.hand.go { animation: dart 150ms ease-out; }
+@keyframes dart {
+  0%, 100% { opacity: 1; transform: translate(var(--h0x, 0px), var(--h0y, 0px)) rotate(var(--hr, 0deg)); }
+  50% { opacity: 1; transform: translate(var(--h1x, 0px), var(--h1y, 0px)) rotate(var(--hr, 0deg)); }
+}
+@keyframes peek { 0%, 100% { opacity: 1; transform: translate(var(--hmx, 0px), var(--hmy, 0px)) rotate(var(--hr, 0deg)); } }
+
 /* Cards */
 .pile { --cw: clamp(116px, 22vw, 164px); position: relative; width: var(--cw); height: calc(var(--cw) * 1.4); }
 .card { position: absolute; inset: 0; border-radius: calc(var(--cw) * .075); transform: translate(var(--dx, 0px), var(--dy, 0px)) rotate(var(--rot, 0deg)); }
@@ -269,6 +281,7 @@ fieldset.settings:disabled { opacity: .5; }
 @media (prefers-reduced-motion: reduce) {
   .card.face.drop, .felt.flash::after { animation: none; }
   .readout { transition: none; }
+  .hand.go { animation: peek 150ms steps(1, end); }
 }
 </style>
 </head>
@@ -290,6 +303,7 @@ fieldset.settings:disabled { opacity: .5; }
     <div class="felt" id="felt" tabindex="0" role="region" aria-label="Card table" aria-describedby="keysHint">
       <span class="seat seat-them" id="seatThem" hidden>Them</span>
       <span class="chip" id="chip" hidden></span>
+      <div class="hand" id="hand" aria-hidden="true"><svg viewBox="0 0 64 96" focusable="false"><g class="palm"><rect x="14" y="10" width="9" height="42" rx="4.5"/><rect x="24" y="4" width="9" height="48" rx="4.5"/><rect x="34" y="7" width="9" height="45" rx="4.5"/><rect x="44" y="15" width="8" height="37" rx="4"/><rect x="12" y="36" width="41" height="36" rx="13"/><rect x="2" y="38" width="9" height="28" rx="4.5" transform="rotate(-28 6.5 52)"/></g><rect class="cuff" x="15" y="68" width="35" height="28" rx="4"/></svg></div>
       <div class="felt-inner">
         <span class="pile-tag" id="pileTag">New pile</span>
         <div class="pile" id="pile"></div>
@@ -365,6 +379,11 @@ fieldset.settings:disabled { opacity: .5; }
           <div class="seg" id="deckSeg" role="group" aria-labelledby="deckLabel"></div>
           <p class="note" id="deckNote"></p>
           <label class="check" for="focus"><input type="checkbox" id="focus"><span><b>Focus on my weak spots.</b> Deals more of the rules you're slowest at or miss most, and more of the near-misses you fall for. Drill mix only.</span></label>
+        </div>
+        <div class="group" data-only="live">
+          <span class="label" id="flinchLabel">Fake flinches</span>
+          <div class="seg" id="flinchSeg" role="group" aria-labelledby="flinchLabel"></div>
+          <p class="note">A hand darts toward the pile on some cards, and now and then a beat late on a real pattern. A false slap within 300 ms of one counts as taking the bait.</p>
         </div>
         <div class="group" data-only="live">
           <span class="label">Memory</span>
@@ -697,6 +716,18 @@ fieldset.settings:disabled { opacity: .5; }
     }
   }
 
+  /* ---------- Fake flinches ---------- */
+  const FLINCHES = [{ v: 'off', name: 'Off' }, { v: 'some', name: 'Some' }, { v: 'lots', name: 'Lots' }];
+  const FLINCH_RATE = { off: [0, 0], some: [0.12, 0.08], lots: [0.3, 0.2] }; // [plain cards, real patterns]
+  const BAIT_WINDOW = 300;
+  // Whether to fake a slap at this card, and how long after it lands. On real patterns it comes a beat late.
+  function flinchPlan(level, isPattern) {
+    const rate = FLINCH_RATE[level] || FLINCH_RATE.off;
+    if (random() >= rate[isPattern ? 1 : 0]) return null;
+    return { delay: isPattern ? randInt(220, 340) : randInt(20, 140) };
+  }
+  const tookBait = (slapAt, flinchAt) => typeof flinchAt === 'number' && slapAt >= flinchAt && slapAt - flinchAt <= BAIT_WINDOW;
+
   /* ---------- Mistakes ---------- */
   // A mistake keeps the last five cards on the pile, the call you should have made and your timing.
   const MISTAKE_CAP = 20;
@@ -746,7 +777,7 @@ fieldset.settings:disabled { opacity: .5; }
   const LENGTHS = [10, 20, 40];
   const PILE_COUNTS = [4, 8, 12];
   const PACE_MIN = 350, PACE_MAX = 1800, LATE_WINDOW = 450;
-  const DEFAULTS = { mode: 'live', rules: { double: true, sandwich: true, topbottom: true, tens: false, marriage: false, run: false }, pace: 900, adaptive: true, deck: 'drill', memory: true, assist: false, length: 20, piles: 8, focus: true };
+  const DEFAULTS = { mode: 'live', rules: { double: true, sandwich: true, topbottom: true, tens: false, marriage: false, run: false }, pace: 900, adaptive: true, deck: 'drill', memory: true, assist: false, length: 20, piles: 8, focus: true, flinch: 'off' };
   const KEY_SETTINGS = 'ew-trainer.settings.v1', KEY_HISTORY = 'ew-trainer.history.v1';
 
   function cleanSettings(s) {
@@ -758,6 +789,7 @@ fieldset.settings:disabled { opacity: .5; }
     if (PACES.some(p => p.v === s.pace)) out.pace = s.pace;
     for (const k of ['adaptive', 'memory', 'assist', 'focus']) if (typeof s[k] === 'boolean') out[k] = s[k];
     if (DECKS.some(d => d.v === s.deck)) out.deck = s.deck;
+    if (FLINCHES.some(f => f.v === s.flinch)) out.flinch = s.flinch;
     if (LENGTHS.includes(s.length)) out.length = s.length;
     if (PILE_COUNTS.includes(s.piles)) out.piles = s.piles;
     return out;
@@ -782,6 +814,7 @@ fieldset.settings:disabled { opacity: .5; }
     FACE_COUNT, isFace, mean, median,
     MISTAKE_CAP, pileTail, mistakeLabel, mistakeTiming,
     KEY_WEAK, LURE_TYPES, cleanWeak, addRoundToWeak, ruleWeakness, ruleShares, lureShares, focusPlan, focusText, targetCardFor, lureCardOf,
+    FLINCHES, FLINCH_RATE, BAIT_WINDOW, flinchPlan, tookBait,
   };
 })(window);
 </script>
@@ -798,6 +831,7 @@ fieldset.settings:disabled { opacity: .5; }
     FACE_COUNT, isFace, mean, median,
     MISTAKE_CAP, pileTail, mistakeLabel, mistakeTiming,
     KEY_WEAK, cleanWeak, addRoundToWeak, focusPlan, focusText,
+    FLINCHES, flinchPlan, tookBait,
   } = window.EWT;
 
   function load(key, fallback) { try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch (err) { return fallback; } }
@@ -810,13 +844,13 @@ fieldset.settings:disabled { opacity: .5; }
     interval: 900, stats: null, cardsSinceCheck: 0, nextCheck: 9,
     timer: 0, doneAt: 0, lastSummary: null, mistakes: [], mistakeCount: 0,
     history: cleanHistory(load(KEY_HISTORY, [])),
-    weak: cleanWeak(load(KEY_WEAK, null)), plan: null,
+    weak: cleanWeak(load(KEY_WEAK, null)), plan: null, flinchTimer: 0, flinchAt: null,
   };
 
   function freshStats() {
     const by = {};
     for (const k of RULES) by[k] = { seen: 0, hit: 0, late: 0, miss: 0, rts: [] };
-    return { hits: 0, late: 0, miss: 0, falses: 0, falseKinds: {}, rts: [], by, mem: { under: [0, 0], bottom: [0, 0] }, cards: 0 };
+    return { hits: 0, late: 0, miss: 0, falses: 0, falseKinds: {}, rts: [], by, mem: { under: [0, 0], bottom: [0, 0] }, cards: 0, flinches: 0, baited: 0 };
   }
   const running = () => S.phase !== 'idle' && S.phase !== 'done';
   const resolvedCount = () => (S.stats ? S.stats.hits + S.stats.late + S.stats.miss : 0);
@@ -952,6 +986,8 @@ fieldset.settings:disabled { opacity: .5; }
     clearTimeout(S.timer);
     const cb = comebackMode();
     stopReplay();
+    clearTimeout(S.flinchTimer);
+    S.flinchAt = null;
     S.stats = freshStats();
     S.mistakes = []; S.mistakeCount = 0;
     S.interval = S.settings.pace;
@@ -999,6 +1035,7 @@ fieldset.settings:disabled { opacity: .5; }
       if (S.top !== entry || S.phase !== 'live') return;
       renderPile(true);
       entry.shownAt = performance.now();
+      scheduleFlinch(entry, null);
       S.timer = setTimeout(tick, S.interval);
     });
   }
@@ -1058,15 +1095,21 @@ fieldset.settings:disabled { opacity: .5; }
     S.stats.falses++;
     const f = falseKind(S.pile, S.settings.rules);
     S.stats.falseKinds[f.kind] = (S.stats.falseKinds[f.kind] || 0) + 1;
-    noteMistake({ kind: 'false', fk: f, cards: pileTail(S.pile), ms: e && e.shownAt ? Math.max(0, Math.round(t - e.shownAt)) : 0, pace: e ? e.pace : Math.round(S.interval) });
+    const bait = tookBait(t, S.flinchAt);
+    if (bait) S.stats.baited++;
+    noteMistake({
+      kind: 'false', fk: f, cards: pileTail(S.pile), ms: e && e.shownAt ? Math.max(0, Math.round(t - e.shownAt)) : 0, pace: e ? e.pace : Math.round(S.interval),
+      bait, gap: bait ? Math.round(t - S.flinchAt) : null, flinch: e && typeof e.flinch === 'number' ? e.flinch : bait ? 0 : null,
+    });
     if (S.settings.adaptive) S.interval = Math.min(PACE_MAX, S.interval * 1.03);
-    say('false', 'Burn', 'False slap. ' + falseText(f));
+    say('false', bait ? 'Bait' : 'Burn', (bait ? 'Took the bait. ' : 'False slap. ') + falseText(f));
     renderHud();
   }
 
   function clearPile(msg, delay) {
     S.phase = 'gap';
     clearTimeout(S.timer);
+    clearTimeout(S.flinchTimer);
     S.pile = []; S.top = null;
     S.pileCap = randInt(7, 16);
     renderPile(false);
@@ -1123,6 +1166,7 @@ fieldset.settings:disabled { opacity: .5; }
   function finishSoon(delay) {
     S.phase = 'ending';
     clearTimeout(S.timer);
+    clearTimeout(S.flinchTimer);
     S.timer = setTimeout(finish, delay);
   }
 
@@ -1170,6 +1214,7 @@ fieldset.settings:disabled { opacity: .5; }
   function stop(message) {
     if (!running()) return;
     clearTimeout(S.timer);
+    clearTimeout(S.flinchTimer);
     S.phase = 'idle';
     S.pile = []; S.top = null; S.recall = null; S.lastMiss = null; S.stats = null;
     CB.challenge = null; CB.collectBy = null;
@@ -1509,6 +1554,7 @@ fieldset.settings:disabled { opacity: .5; }
       memRight: st.mem.under[0] + st.mem.bottom[0], memTotal: st.mem.under[1] + st.mem.bottom[1],
       paceStart: set.pace, paceEnd: Math.round(S.interval), adaptive: set.adaptive, deck: set.deck,
       focus: S.plan ? focusText(S.plan) : null,
+      flinch: set.flinch, flinches: st.flinches, baited: st.baited,
       rules: RULES.filter(k => set.rules[k]), cards: st.cards,
       mistakes: S.mistakes.slice(), mistakeCount: S.mistakeCount,
     };
@@ -1517,6 +1563,7 @@ fieldset.settings:disabled { opacity: .5; }
   function coach(sum) {
     const tips = [];
     const row = Object.fromEntries(sum.rows.map(r => [r.key, r]));
+    if (sum.baited >= 2) tips.push(['false', `You took the bait ${sum.baited} times: false slaps within 300 ms of a fake flinch. Watch the card, not the hands.`]);
     if (sum.falses >= 3 && sum.falses >= sum.hits * 0.25) {
       const top = Object.entries(sum.falseKinds || {}).sort((a, b) => b[1] - a[1])[0];
       const lines = {
@@ -1580,7 +1627,9 @@ fieldset.settings:disabled { opacity: .5; }
 
     $('tFalseL').textContent = 'False slaps';
     $('rFalse').textContent = String(sum.falses);
-    $('rFalseSub').textContent = sum.falses ? 'Each one burns a card' : 'Clean';
+    $('rFalseSub').textContent = sum.falses
+      ? 'Each one burns a card' + (sum.baited ? ` · ${sum.baited} took the bait` : '')
+      : sum.flinches ? `Clean through ${sum.flinches} flinch${sum.flinches === 1 ? '' : 'es'}` : 'Clean';
     level($('tileFalse'), sum.falses <= 1 ? 'good' : sum.falses <= 3 ? 'mid' : 'low');
 
     $('tMemL').textContent = 'Memory checks';
@@ -1701,6 +1750,46 @@ fieldset.settings:disabled { opacity: .5; }
     renderMistakes(sum.mistakes, sum.mistakeCount);
   }
 
+  /* ---------- Fake flinches ---------- */
+  const handEl = $('hand');
+  // Draw the hand darting in from `fromEl` (a seat), or from a random edge, toward the pile.
+  function flinch(fromEl) {
+    const fr = felt.getBoundingClientRect(), pr = pileEl.getBoundingClientRect();
+    if (!fr.width || !pr.width) return;
+    const cx = pr.left - fr.left + pr.width / 2, cy = pr.top - fr.top + pr.height / 2;
+    let ang;
+    if (fromEl) { const sr = fromEl.getBoundingClientRect(); ang = Math.atan2(sr.top + sr.height / 2 - fr.top - cy, sr.left + sr.width / 2 - fr.left - cx); }
+    else ang = pick([0, Math.PI / 2, Math.PI, -Math.PI / 2]) + (Math.random() - 0.5) * 0.7;
+    const cos = Math.cos(ang), sin = Math.sin(ang);
+    // Distance from the pile to the table's edge along the hand's path.
+    const edge = Math.min(cos > 0.01 ? (fr.width - cx) / cos : cos < -0.01 ? cx / -cos : Infinity, sin > 0.01 ? (fr.height - cy) / sin : sin < -0.01 ? cy / -sin : Infinity);
+    const near = Math.max(pr.width, pr.height) / 2 + 40, far = Math.max(near + 40, edge + 50);
+    const put = (name, d) => {
+      handEl.style.setProperty(name + 'x', (cos * d).toFixed(1) + 'px');
+      handEl.style.setProperty(name + 'y', (sin * d).toFixed(1) + 'px');
+    };
+    handEl.style.left = cx + 'px';
+    handEl.style.top = cy + 'px';
+    put('--h0', far); put('--h1', near); put('--hm', Math.max(near, edge - 30));
+    handEl.style.setProperty('--hr', (ang * 180 / Math.PI - 90).toFixed(1) + 'deg');
+    handEl.classList.remove('go');
+    void handEl.offsetWidth;
+    handEl.classList.add('go');
+  }
+  // `from` is a seat element, a function returning one, or null for a random edge.
+  function scheduleFlinch(entry, from) {
+    clearTimeout(S.flinchTimer);
+    const plan = flinchPlan(S.settings.flinch, !!entry.primary);
+    if (!plan) return;
+    S.flinchTimer = setTimeout(() => {
+      if (S.top !== entry || S.phase !== 'live') return;
+      S.flinchAt = performance.now();
+      entry.flinch = Math.round(S.flinchAt - entry.shownAt);
+      S.stats.flinches++;
+      flinch(typeof from === 'function' ? from() : from);
+    }, plan.delay);
+  }
+
   function noteMistake(m) {
     S.mistakeCount++;
     if (S.mistakes.length < MISTAKE_CAP) S.mistakes.push(m);
@@ -1742,9 +1831,10 @@ fieldset.settings:disabled { opacity: .5; }
   }
 
   // Replays a mistake's cards on the table at the pace they were dealt.
-  const RP = { on: false, timer: 0, btn: null };
+  const RP = { on: false, timer: 0, ftimer: 0, btn: null };
   function stopReplay() {
     clearTimeout(RP.timer);
+    clearTimeout(RP.ftimer);
     if (RP.btn) RP.btn.setAttribute('aria-pressed', 'false');
     RP.on = false; RP.btn = null;
   }
@@ -1766,6 +1856,7 @@ fieldset.settings:disabled { opacity: .5; }
       shown++;
       drawPile(cards.slice(0, shown), true);
       if (shown < cards.length) { RP.timer = setTimeout(step, pace); return; }
+      if (typeof m.flinch === 'number') RP.ftimer = setTimeout(() => flinch(null), m.flinch);
       RP.timer = setTimeout(() => {
         const kind = m.kind === 'false' ? 'false' : m.kind === 'late' ? 'late' : 'miss';
         const title = m.kind === 'false' ? (m.bait ? 'Bait' : 'Burn') : m.kind === 'late' ? 'Late' : 'Missed';
@@ -1849,6 +1940,7 @@ fieldset.settings:disabled { opacity: .5; }
     buildSeg('modeSeg', MODES.map(m => ({ v: m.v, html: m.name })), 'mode');
     buildSeg('paceSeg', PACES.map(p => ({ v: p.v, html: `${p.name}<small>${p.v} ms</small>` })), 'pace');
     buildSeg('deckSeg', DECKS.map(d => ({ v: d.v, html: d.name })), 'deck');
+    buildSeg('flinchSeg', FLINCHES.map(f => ({ v: f.v, html: f.name })), 'flinch');
     buildSeg('lenSeg', LENGTHS.map(n => ({ v: n, html: `${n}<small>patterns</small>` })), 'length');
     buildSeg('pilesSeg', PILE_COUNTS.map(n => ({ v: n, html: `${n}<small>piles</small>` })), 'piles');
     for (const [id, key] of [['adaptive', 'adaptive'], ['memory', 'memory'], ['assistBox', 'assist'], ['focus', 'focus']]) {
@@ -1857,7 +1949,7 @@ fieldset.settings:disabled { opacity: .5; }
   }
   function syncSettings() {
     for (const b of $('rules').children) b.setAttribute('aria-pressed', String(!!S.settings.rules[b.dataset.rule]));
-    for (const [id, key] of [['modeSeg', 'mode'], ['paceSeg', 'pace'], ['deckSeg', 'deck'], ['lenSeg', 'length'], ['pilesSeg', 'piles']]) {
+    for (const [id, key] of [['modeSeg', 'mode'], ['paceSeg', 'pace'], ['deckSeg', 'deck'], ['lenSeg', 'length'], ['pilesSeg', 'piles'], ['flinchSeg', 'flinch']]) {
       for (const b of $(id).children) b.setAttribute('aria-pressed', String(b.dataset.v === String(S.settings[key])));
     }
     $('adaptive').checked = S.settings.adaptive;
@@ -1953,7 +2045,7 @@ fieldset.settings:disabled { opacity: .5; }
     if (hot && typeof hot.snapshot === 'function') hot.snapshot(() => ({ settings: S.settings, last: S.lastSummary }));
   }
 
-  window.ewt = { patternsOf, targetCard, lureCard, neutralCard, drillCard, falseKind, isRun, makeWinScript, S, CB };
+  window.ewt = { patternsOf, targetCard, lureCard, neutralCard, drillCard, falseKind, isRun, makeWinScript, S, CB, RP, flinch };
   const hot = window.claude && window.claude.hot;
   if (hot && typeof hot.ready === 'function') hot.ready(boot);
   else boot((hot && hot.data) || {});

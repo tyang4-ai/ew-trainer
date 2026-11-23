@@ -216,5 +216,31 @@ test('drillCard with a focus plan leans toward the weak rule and keeps the same 
   assert.ok(Math.abs(focus.rate - plain.rate) < 0.05, `pattern rate ${plain.rate.toFixed(3)} vs ${focus.rate.toFixed(3)}`);
 });
 
+/* ---------- Fake flinches ---------- */
+test('flinchPlan: off never flinches, lots flinches more than some, real patterns get a late flinch', () => {
+  const rate = (level, pat) => { let n = 0; for (let i = 0; i < 20000; i++) if (E.flinchPlan(level, pat)) n++; return n / 20000; };
+  assert.strictEqual(rate('off', false) + rate('off', true), 0);
+  const some = rate('some', false), lots = rate('lots', false);
+  assert.ok(Math.abs(some - 0.12) < 0.015 && Math.abs(lots - 0.3) < 0.015, `${some} ${lots}`);
+  assert.ok(rate('lots', true) > rate('some', true) && rate('some', true) > 0.05);
+  for (let i = 0; i < 2000; i++) {
+    const plain = E.flinchPlan('lots', false), late = E.flinchPlan('lots', true);
+    if (plain) assert.ok(plain.delay >= 20 && plain.delay <= 140);
+    if (late) assert.ok(late.delay >= 220 && late.delay <= 340, 'a beat late on real patterns');
+  }
+});
+test('tookBait counts false slaps within 300 ms after a flinch', () => {
+  assert.strictEqual(E.tookBait(1000, 800), true);
+  assert.strictEqual(E.tookBait(1100, 800), true);
+  assert.strictEqual(E.tookBait(1101, 800), false);
+  assert.strictEqual(E.tookBait(790, 800), false, 'before the flinch');
+  assert.strictEqual(E.tookBait(1000, null), false);
+});
+test('cleanSettings accepts flinch levels and defaults to off', () => {
+  assert.strictEqual(E.cleanSettings({}).flinch, 'off');
+  assert.strictEqual(E.cleanSettings({ flinch: 'lots' }).flinch, 'lots');
+  assert.strictEqual(E.cleanSettings({ flinch: 'always' }).flinch, 'off');
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exitCode = failed ? 1 : 0;
