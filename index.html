@@ -289,6 +289,17 @@ fieldset.settings:disabled { opacity: .5; }
 .chart .xhair { stroke: var(--muted); stroke-width: 1; }
 .chart .dot { fill: var(--stock); stroke: var(--raise); stroke-width: 2; }
 
+/* Mental math sprint */
+.mathbox { display: none; justify-items: center; gap: 14px; width: 100%; }
+.felt.math .mathbox { display: grid; }
+.felt.math .pile, .felt.math .pile-tag, .felt.math .assist { display: none; }
+.felt.math { place-items: start center; cursor: text; }
+.math-q { margin: 0; font-family: var(--display); font-weight: 800; font-size: clamp(2.6rem, 11vw, 4.4rem); line-height: 1.05; letter-spacing: -.01em; color: var(--stock); font-variant-numeric: lining-nums tabular-nums; white-space: nowrap; }
+.math-q.idle { color: var(--muted); }
+.math-in { width: min(100%, 220px); min-height: 56px; padding: 8px 14px; border-radius: 14px; border: 1px solid var(--rule); background: rgba(0, 0, 0, .22); color: var(--stock); font: 800 2rem/1 var(--display); font-variant-numeric: lining-nums tabular-nums; text-align: center; caret-color: var(--stock); -webkit-user-select: text; user-select: text; }
+.math-in:focus { outline: 2px solid var(--stock); outline-offset: 2px; }
+.math-in:disabled { opacity: .45; }
+
 /* How it works + history */
 .steps { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; counter-reset: step; }
 .steps li { counter-increment: step; display: grid; grid-template-columns: 26px 1fr; gap: 8px; font-size: .92rem; line-height: 1.45; }
@@ -316,6 +327,13 @@ fieldset.settings:disabled { opacity: .5; }
   .history .h-false, .history .h-pace { display: none; }
 }
 @media (max-width: 380px) { .rules { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 600px) {
+  /* Four drills: two rows on phones */
+  .seg.four { grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .seg.four button + button { border-left: 0; }
+  .seg.four button:nth-child(even) { border-left: 1px solid var(--rule); }
+  .seg.four button:nth-child(n + 3) { border-top: 1px solid var(--rule); }
+}
 @media (prefers-reduced-motion: reduce) {
   .card.face.drop, .felt.flash::after { animation: none; }
   .readout { transition: none; }
@@ -346,6 +364,7 @@ fieldset.settings:disabled { opacity: .5; }
       <div class="felt-inner">
         <span class="pile-tag" id="pileTag">New pile</span>
         <div class="pile" id="pile"></div>
+        <div class="mathbox" id="mathBox"><p class="math-q idle" id="mathQ">7 × 48</p><input class="math-in" id="mathIn" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="next" maxlength="5" aria-label="Your answer" disabled></div>
         <div class="assist" id="assist" hidden></div>
         <div class="readout" id="readout" aria-live="polite">
           <div class="readout-num" id="readoutNum"></div>
@@ -422,6 +441,15 @@ fieldset.settings:disabled { opacity: .5; }
           <span class="label" id="burnLabel">A false slap burns</span>
           <div class="seg" id="burnSeg" role="group" aria-labelledby="burnLabel"></div>
         </div>
+        <div class="group" data-only="math">
+          <span class="label" id="mdurLabel">Sprint length</span>
+          <div class="seg" id="mdurSeg" role="group" aria-labelledby="mdurLabel"></div>
+        </div>
+        <div class="group" data-only="math">
+          <span class="label" id="opsLabel">Questions</span>
+          <div class="rules" id="ops" role="group" aria-labelledby="opsLabel"></div>
+          <p class="note" id="opsNote">Keep at least one type on.</p>
+        </div>
         <div class="group" data-only="live match">
           <span class="label" id="rulesLabel">Slap on</span>
           <div class="rules" id="rules" role="group" aria-labelledby="rulesLabel"></div>
@@ -456,6 +484,10 @@ fieldset.settings:disabled { opacity: .5; }
           <span class="label" id="pilesLabel">Round length</span>
           <div class="seg" id="pilesSeg" role="group" aria-labelledby="pilesLabel"></div>
         </div>
+        <div class="group">
+          <span class="label">Extra drills</span>
+          <label class="check" for="extraMath"><input type="checkbox" id="extraMath"><span><b>Mental math.</b> Adds a Math option under Drill: a timed sprint like Zetamac.</span></label>
+        </div>
       </fieldset>
     </section>
 
@@ -465,6 +497,11 @@ fieldset.settings:disabled { opacity: .5; }
         <li><span>Cards land one at a time. Once a card is covered you can't see it again, same as a real pile.</span></li>
         <li><span>Press <kbd>Space</kbd> or tap the table when the top card completes one of your rules. You have until the next card lands.</span></li>
         <li><span>Each catch shows your reaction time. Memory checks pause the deal and ask what's under the top card or what started the pile.</span></li>
+      </ol>
+      <ol class="steps" data-only="math">
+        <li><span>Answer as many questions as you can before the clock runs out: 60, 120 or 180 seconds.</span></li>
+        <li><span>Type the answer. The next question comes up the moment it's right, no Enter needed. On a phone the number pad opens.</span></li>
+        <li><span>Results show your score, your average time per answer for each type, and your slowest questions.</span></li>
       </ol>
       <ol class="steps" data-only="match">
         <li><span>You and 1 to 3 bots split a shuffled deck. Cards are played for everyone in turn at your pace. Your seat is at the bottom of the table.</span></li>
@@ -956,11 +993,57 @@ fieldset.settings:disabled { opacity: .5; }
   }
   const ladderUnlocked = l => BOT_ORDER.filter((k, i) => i === 0 || l.beaten[BOT_ORDER[i - 1]]);
 
+  /* ---------- Mental math sprint ---------- */
+  const KEY_MATH = 'ew-trainer.math.v1';
+  const MATH_OPS = ['add', 'sub', 'mul', 'div'];
+  const MATH_UI = [
+    { key: 'add', name: 'Addition', eg: '48 + 27', desc: '2 to 100, plus 2 to 100' },
+    { key: 'sub', name: 'Subtraction', eg: '75 − 27', desc: 'Addition in reverse' },
+    { key: 'mul', name: 'Multiplication', eg: '7 × 48', desc: '2 to 12, times 2 to 100' },
+    { key: 'div', name: 'Division', eg: '336 ÷ 7', desc: 'Multiplication in reverse' },
+  ];
+  const MATH_NAME = { add: 'Addition', sub: 'Subtraction', mul: 'Multiplication', div: 'Division' };
+  const MATH_SIGN = { add: '+', sub: '−', mul: '×', div: '÷' };
+  const MATH_DURS = [60, 120, 180];
+  // Zetamac-style: addition 2-100 + 2-100, multiplication 2-12 x 2-100, and each one in reverse.
+  function mathQuestion(ops, prev) {
+    const types = MATH_OPS.filter(k => ops && ops[k]);
+    if (!types.length) types.push('add');
+    for (let tries = 0; ; tries++) {
+      const type = pick(types), small = type === 'mul' || type === 'div';
+      const a = small ? randInt(2, 12) : randInt(2, 100), b = randInt(2, 100);
+      let x, y, answer;
+      if (type === 'add') { x = a; y = b; answer = a + b; }
+      else if (type === 'sub') { x = a + b; y = a; answer = b; }
+      else if (type === 'mul') { [x, y] = random() < 0.5 ? [a, b] : [b, a]; answer = a * b; }
+      else { x = a * b; y = a; answer = b; }
+      const q = { type, x, y, answer, text: `${x} ${MATH_SIGN[type]} ${y}` };
+      if (!prev || q.text !== prev.text || tries > 20) return q;
+    }
+  }
+  // answers: [{ type, text, answer, ms }]
+  function mathSummary(answers) {
+    const by = {};
+    for (const a of answers) (by[a.type] = by[a.type] || []).push(a.ms);
+    return {
+      score: answers.length,
+      avg: answers.length ? Math.round(mean(answers.map(a => a.ms))) : null,
+      byType: MATH_OPS.filter(k => by[k]).map(k => ({ type: k, n: by[k].length, avg: Math.round(mean(by[k])) })),
+      slowest: answers.slice().sort((p, q) => q.ms - p.ms).slice(0, 5).map(a => ({ text: a.text, answer: a.answer, ms: Math.round(a.ms) })),
+    };
+  }
+  function cleanMathBest(x) {
+    const best = {};
+    for (const d of MATH_DURS) { const v = x && x.best && x.best[d]; best[d] = typeof v === 'number' && isFinite(v) && v > 0 ? Math.round(v) : 0; }
+    return { best };
+  }
+
   /* ---------- Settings and state ---------- */
   const MODES = [
     { v: 'live', name: 'Live patterns', note: `Spot patterns the instant they land and keep track of what's buried.` },
     { v: 'comeback', name: 'Comebacks', note: 'Two players. Win a pile, remember how it ended, then catch it when your own cards bring it back. Uses doubles and sandwiches.' },
     { v: 'match', name: 'Match', note: 'A real game against 1 to 3 bots, slapping on your Live patterns house rules. The fastest valid slap takes the pile, and the last player with cards wins.' },
+    { v: 'math', name: 'Math', note: 'A timed mental-math sprint, like Zetamac. Type each answer; it moves on the moment it is right.' },
   ];
   const PACES = [
     { v: 1200, name: 'Warm-up' },
@@ -977,7 +1060,8 @@ fieldset.settings:disabled { opacity: .5; }
   const PILE_COUNTS = [4, 8, 12];
   const PACE_MIN = 350, PACE_MAX = 1800, LATE_WINDOW = 450;
   const DEFAULTS = { mode: 'live', rules: { double: true, sandwich: true, topbottom: true, tens: false, marriage: false, run: false }, pace: 900, adaptive: true, deck: 'drill', memory: true, assist: false, length: 20, piles: 8, focus: true, flinch: 'off',
-    matchOpp: 'ladder', ladderBot: 'casual', freeBots: { casual: 1, club: 1, shark: 0, spammer: 0, counter: 0 }, matchLen: 'full', burn: 1 };
+    matchOpp: 'ladder', ladderBot: 'casual', freeBots: { casual: 1, club: 1, shark: 0, spammer: 0, counter: 0 }, matchLen: 'full', burn: 1,
+    extraMath: false, mathDur: 120, mathOps: { add: true, sub: true, mul: true, div: true } };
   const KEY_SETTINGS = 'ew-trainer.settings.v1', KEY_HISTORY = 'ew-trainer.history.v1';
 
   function cleanSettings(s) {
@@ -987,7 +1071,11 @@ fieldset.settings:disabled { opacity: .5; }
     if (s.rules && typeof s.rules === 'object') for (const k of RULES) if (typeof s.rules[k] === 'boolean') out.rules[k] = s.rules[k];
     if (!RULES.some(k => out.rules[k])) out.rules.double = true;
     if (PACES.some(p => p.v === s.pace)) out.pace = s.pace;
-    for (const k of ['adaptive', 'memory', 'assist', 'focus']) if (typeof s[k] === 'boolean') out[k] = s[k];
+    for (const k of ['adaptive', 'memory', 'assist', 'focus', 'extraMath']) if (typeof s[k] === 'boolean') out[k] = s[k];
+    if (MATH_DURS.includes(s.mathDur)) out.mathDur = s.mathDur;
+    if (s.mathOps && typeof s.mathOps === 'object') for (const k of MATH_OPS) if (typeof s.mathOps[k] === 'boolean') out.mathOps[k] = s.mathOps[k];
+    if (!MATH_OPS.some(k => out.mathOps[k])) out.mathOps.add = true;
+    if (out.mode === 'math' && !out.extraMath) out.mode = 'live'; // the Math drill only shows when it's turned on
     if (DECKS.some(d => d.v === s.deck)) out.deck = s.deck;
     if (FLINCHES.some(f => f.v === s.flinch)) out.flinch = s.flinch;
     if (OPPS.some(o => o.v === s.matchOpp)) out.matchOpp = s.matchOpp;
@@ -1036,6 +1124,7 @@ fieldset.settings:disabled { opacity: .5; }
     FLINCHES, FLINCH_RATE, BAIT_WINDOW, flinchPlan, tookBait,
     BOTS, BOT_ORDER, OPPS, MATCH_LENGTHS, BURNS, botReaction, slapRace, newMatch, nextSeat, matchNext, matchPlay, matchCollect, matchBurn, matchAlive, matchOver, matchLeaders, matchResult,
     KEY_LADDER, cleanLadder, ladderUnlocked,
+    KEY_MATH, MATH_OPS, MATH_UI, MATH_NAME, MATH_DURS, mathQuestion, mathSummary, cleanMathBest,
   };
 })(window);
 </script>
@@ -1055,6 +1144,7 @@ fieldset.settings:disabled { opacity: .5; }
     FLINCHES, flinchPlan, tookBait,
     BOTS, BOT_ORDER, OPPS, MATCH_LENGTHS, BURNS, botReaction, newMatch, matchNext, matchPlay, matchCollect, matchBurn, matchOver, matchResult,
     KEY_LADDER, cleanLadder, ladderUnlocked,
+    KEY_MATH, MATH_OPS, MATH_UI, MATH_NAME, MATH_DURS, mathQuestion, mathSummary, cleanMathBest,
   } = window.EWT;
 
   function load(key, fallback) { try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch (err) { return fallback; } }
@@ -1069,6 +1159,7 @@ fieldset.settings:disabled { opacity: .5; }
     history: cleanHistory(load(KEY_HISTORY, [])),
     weak: cleanWeak(load(KEY_WEAK, null)), plan: null, flinchTimer: 0, flinchAt: null,
     ladder: cleanLadder(load(KEY_LADDER, null)),
+    mathBest: cleanMathBest(load(KEY_MATH, null)),
   };
 
   function freshStats() {
@@ -1177,6 +1268,7 @@ fieldset.settings:disabled { opacity: .5; }
     $('hudL3').textContent = 'False slaps';
     $('hudL4').textContent = 'Pace';
     if (matchMode()) { renderMatchHud(); return; }
+    if (mathMode()) { renderMathHud(); return; }
     const cb = comebackMode();
     $('hudL1').textContent = cb ? 'Piles' : 'Patterns';
     $('hudL2').textContent = cb ? 'Right calls' : 'Caught';
@@ -1227,7 +1319,7 @@ fieldset.settings:disabled { opacity: .5; }
   function start() {
     if (running()) return;
     clearRoundTimers();
-    const cb = comebackMode(), match = matchMode();
+    const cb = comebackMode(), match = matchMode(), math = mathMode();
     stopReplay();
     S.flinchAt = null;
     S.stats = freshStats();
@@ -1242,7 +1334,10 @@ fieldset.settings:disabled { opacity: .5; }
     felt.classList.toggle('cb', cb);
     felt.classList.toggle('match', match);
     felt.focus({ preventScroll: true });
-    if (window.matchMedia && window.matchMedia('(max-width: 880px)').matches) felt.scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' });
+    if (window.matchMedia && window.matchMedia('(max-width: 880px)').matches) {
+      if (math) document.querySelector('.table').scrollIntoView({ block: 'start' });
+      else felt.scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' });
+    }
     if (cb) {
       S.stats.cb = { eps: [], lock: [0, 0], liveHit: 0, liveLate: 0, liveMiss: 0, liveRts: [] };
       CB.turn = 'them'; CB.challenge = null; CB.collectBy = null;
@@ -1250,6 +1345,8 @@ fieldset.settings:disabled { opacity: .5; }
       say('', '', 'Win a pile first by slapping its pattern.');
     } else if (match) {
       matchStart();
+    } else if (math) {
+      mathStart();
     } else {
       S.plan = S.settings.deck === 'drill' && S.settings.focus ? focusPlan(S.weak, S.settings.rules) : null;
       S.pileCap = randInt(7, 16);
@@ -1259,6 +1356,7 @@ fieldset.settings:disabled { opacity: .5; }
     renderPile(false);
     renderSeats();
     renderHud();
+    if (math) return;
     S.timer = match ? setTimeout(mStep, 900) : setTimeout(() => { if (S.phase === 'gap') { S.phase = 'live'; if (cb) cbPlay(); else placeCard(); } }, 900);
   }
 
@@ -1311,6 +1409,7 @@ fieldset.settings:disabled { opacity: .5; }
     if (S.phase === 'done') { if (performance.now() - S.doneAt > 900) start(); return; }
     if (comebackMode()) { cbSlap(t); return; }
     if (matchMode()) { mSlap(t); return; }
+    if (mathMode()) return;
     if (S.phase === 'recall') return;
     const e = S.top;
     if (S.phase === 'live' && e && e.primary && !e.resolved && e.shownAt && t >= e.shownAt) {
@@ -1415,6 +1514,7 @@ fieldset.settings:disabled { opacity: .5; }
     clearTimeout(S.flinchTimer);
     clearMatchTimers();
     clearInterval(MT.clock);
+    clearInterval(MS.clock);
   }
 
   function finishSoon(delay) {
@@ -1427,6 +1527,8 @@ fieldset.settings:disabled { opacity: .5; }
     settingsFs.disabled = false; lockNote.hidden = true;
     startBtn.hidden = false; stopBtn.hidden = true;
     felt.classList.remove('live', 'cb', 'match');
+    if (document.activeElement === mathIn) mathIn.blur();
+    mathIdle();
     recallEl.hidden = true;
     setHint(RECALL_HINT);
     assistEl.hidden = true;
@@ -1438,11 +1540,13 @@ fieldset.settings:disabled { opacity: .5; }
     if (S.phase !== 'ending') return;
     S.phase = 'done';
     S.doneAt = performance.now();
-    const cb = comebackMode(), match = matchMode();
-    const sum = cb ? summarizeCB() : match ? summarizeMatch() : summarize();
+    const cb = comebackMode(), match = matchMode(), math = mathMode();
+    const sum = cb ? summarizeCB() : match ? summarizeMatch() : math ? summarizeMath() : summarize();
     S.lastSummary = sum;
     S.history.unshift(cb
       ? { at: sum.at, mode: 'comeback', acc: sum.acc, avg: sum.avg, falses: sum.falses, pace: sum.pace, deck: 'drill' }
+      : math
+        ? { at: sum.at, mode: 'math', acc: 0, avg: sum.avg, falses: 0, pace: 0, deck: 'drill', score: sum.score, dur: sum.dur }
       : match
         ? { at: sum.at, mode: 'match', acc: sum.acc, avg: sum.avg, falses: sum.falses, pace: sum.pace, deck: 'real', result: sum.result, opp: sum.opp }
         : { at: sum.at, mode: 'live', acc: sum.acc, avg: sum.avg, falses: sum.falses, pace: sum.paceEnd, deck: sum.deck });
@@ -1458,11 +1562,19 @@ fieldset.settings:disabled { opacity: .5; }
         if (next) sum.unlocked = BOTS[next].name;
         syncSettings();
       }
+    } else if (math) {
+      // Best score per sprint length, kept apart from the 12-round history.
+      sum.prevBest = S.mathBest.best[sum.dur] || 0;
+      sum.newBest = sum.score > sum.prevBest;
+      sum.best = Math.max(sum.prevBest, sum.score);
+      if (sum.newBest) { S.mathBest.best[sum.dur] = sum.score; store(KEY_MATH, S.mathBest); }
     } else if (!cb) { S.weak = addRoundToWeak(S.weak, S.stats); store(KEY_WEAK, S.weak); }
     endUi();
-    if (cb) renderResultsCB(sum); else if (match) renderResultsMatch(sum); else renderResults(sum);
+    if (cb) renderResultsCB(sum); else if (match) renderResultsMatch(sum); else if (math) renderResultsMath(sum); else renderResults(sum);
     renderHistory();
-    if (match) {
+    if (math) {
+      say('done', sum.score + '<small>right</small>', sum.avg === null ? 'No answers this time.' : secs(sum.avg) + ' s per answer' + (sum.newBest ? ' · new best' : ''));
+    } else if (match) {
       say('done', (RESULT_WORD[sum.result] || '') + '<small>' + sum.myCards + ' cards</small>', resultLine(sum));
     } else if (cb) {
       const right = sum.caught + sum.held;
@@ -1483,6 +1595,7 @@ fieldset.settings:disabled { opacity: .5; }
     clearRoundTimers();
     S.phase = 'idle';
     MT.m = null;
+    MS.answers = []; MS.endsAt = 0;
     S.pile = []; S.top = null; S.recall = null; S.lastMiss = null; S.stats = null;
     CB.challenge = null; CB.collectBy = null;
     endUi();
@@ -2105,6 +2218,115 @@ fieldset.settings:disabled { opacity: .5; }
     finishSoon(1300);
   }
 
+  /* ---------- Mental math sprint ---------- */
+  const MS = { q: null, answers: [], startAt: 0, endsAt: 0, clock: 0, dur: 0 };
+  const mathQ = $('mathQ'), mathIn = $('mathIn');
+  const mathMode = () => S.settings.mode === 'math';
+  function mathIdle() {
+    mathQ.textContent = '7 × 48';
+    mathQ.classList.add('idle');
+    mathIn.value = '';
+    mathIn.disabled = true;
+  }
+  // Runs inside the tap or key press that started the round, so iOS opens the number pad.
+  function mathStart() {
+    MS.answers = [];
+    MS.dur = S.settings.mathDur;
+    MS.startAt = performance.now();
+    MS.endsAt = MS.startAt + MS.dur * 1000;
+    MS.q = null;
+    S.phase = 'live';
+    mathQ.classList.remove('idle');
+    mathIn.disabled = false;
+    mathIn.value = '';
+    mathIn.focus({ preventScroll: true });
+    mathNext();
+    clearInterval(MS.clock);
+    MS.clock = setInterval(mathClock, 200);
+    say('', '', 'Type the answer. It moves on the moment it is right.');
+  }
+  function mathNext() {
+    MS.q = mathQuestion(S.settings.mathOps, MS.q);
+    MS.q.shownAt = performance.now();
+    mathQ.textContent = MS.q.text;
+  }
+  function mathClock() {
+    if (S.phase !== 'live' || !mathMode()) return;
+    renderHud();
+    if (performance.now() >= MS.endsAt) {
+      mathIn.disabled = true;
+      mathIn.blur();
+      finishSoon(0);
+    }
+  }
+  mathIn.addEventListener('input', () => {
+    const digits = mathIn.value.replace(/\D/g, '').slice(0, 5);
+    if (digits !== mathIn.value) mathIn.value = digits;
+    if (S.phase !== 'live' || !mathMode() || !MS.q || !digits || Number(digits) !== MS.q.answer) return;
+    MS.answers.push({ type: MS.q.type, text: MS.q.text, answer: MS.q.answer, ms: performance.now() - MS.q.shownAt });
+    mathIn.value = '';
+    say('', `${MS.answers.length}<small>right</small>`, '');
+    mathNext();
+    renderHud();
+  });
+  function renderMathHud() {
+    const on = running() && MS.endsAt;
+    $('hudL1').textContent = 'Score';
+    $('hudL2').textContent = 'Time left';
+    $('hudL3').textContent = 'Per answer';
+    $('hudL4').textContent = 'Sprint';
+    $('hudPatterns').textContent = String(MS.answers.length);
+    $('hudCaught').textContent = clockText(on ? Math.max(0, MS.endsAt - performance.now()) : (MS.dur || S.settings.mathDur) * 1000);
+    $('hudFalse').textContent = MS.answers.length ? `${(mean(MS.answers.map(a => a.ms)) / 1000).toFixed(1)} s` : '–';
+    $('hudPace').textContent = `${S.settings.mathDur} s`;
+  }
+
+  function summarizeMath() {
+    return Object.assign({ mode: 'math', at: Date.now(), dur: MS.dur, ops: MATH_OPS.filter(k => S.settings.mathOps[k]), best: 0, prevBest: 0, newBest: false }, mathSummary(MS.answers));
+  }
+  const secs = ms => (ms / 1000).toFixed(1);
+  function renderResultsMath(sum) {
+    $('results').hidden = false;
+    $('rFocus').hidden = true;
+    renderChart(null);
+    renderMistakes([], 0);
+    $('resultsMeta').textContent = `Math sprint · ${sum.dur} s · ${sum.ops.map(k => MATH_NAME[k]).join(', ')}`;
+
+    $('tAvgL').textContent = 'Score';
+    $('rAvg').innerHTML = `${sum.score}<small>right</small>`;
+    $('rAvgSub').textContent = sum.newBest ? (sum.prevBest ? `New best for ${sum.dur} s, up from ${sum.prevBest}` : `First score for ${sum.dur} s`) : `Best for ${sum.dur} s: ${sum.best}`;
+    level($('tileAvg'), sum.newBest ? 'good' : sum.best && sum.score >= sum.best * 0.9 ? 'mid' : '');
+
+    $('tAccL').textContent = 'Per answer';
+    $('rAcc').innerHTML = sum.avg === null ? '–' : `${secs(sum.avg)}<small>s</small>`;
+    $('rAccSub').textContent = `${Math.round(sum.score / sum.dur * 60)} a minute`;
+    level($('tileAcc'), '');
+
+    const sorted = sum.byType.slice().sort((a, b) => a.avg - b.avg);
+    $('tFalseL').textContent = 'Quickest type';
+    $('rFalse').innerHTML = sorted.length ? `${secs(sorted[0].avg)}<small>s</small>` : '–';
+    $('rFalseSub').textContent = sorted.length ? MATH_NAME[sorted[0].type] : 'No answers';
+    level($('tileFalse'), '');
+
+    $('tMemL').textContent = 'Slowest type';
+    $('rMem').innerHTML = sorted.length > 1 ? `${secs(sorted[sorted.length - 1].avg)}<small>s</small>` : '–';
+    $('rMemSub').textContent = sorted.length > 1 ? MATH_NAME[sorted[sorted.length - 1].type] : 'Only one type answered';
+    level($('tileMem'), '');
+
+    $('rHead').innerHTML = '<tr><th scope="col">Type</th><th scope="col">Answered</th><th scope="col">Per answer</th></tr>';
+    const maxAvg = Math.max(1, ...sum.byType.map(r => r.avg));
+    const body = $('rRows');
+    body.textContent = '';
+    for (const r of sum.byType) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<th scope="row">${MATH_NAME[r.type]}</th><td>${r.n}</td><td><span class="avgcell"><span class="bar" style="--w:${(r.avg / maxAvg).toFixed(3)}"></span>${secs(r.avg)} s</span></td>`;
+      body.appendChild(tr);
+    }
+    const tips = sum.slowest.map(q => ['late', `Slowest: ${q.text} = ${q.answer}, ${secs(q.ms)} s`]);
+    if (!sum.score) tips.push(['miss', 'No answers this time. Type the answer and it moves on by itself, no Enter needed.']);
+    fillCoach(tips);
+  }
+
   /* ---------- Results ---------- */
   function summarize() {
     const st = S.stats, set = S.settings;
@@ -2465,6 +2687,33 @@ fieldset.settings:disabled { opacity: .5; }
     box.appendChild(svg);
   }
 
+  /* ---------- Math settings ---------- */
+  function buildMathSettings() {
+    buildSeg('mdurSeg', MATH_DURS.map(d => ({ v: d, html: `${d} s` })), 'mathDur');
+    const opsEl = $('ops');
+    for (const o of MATH_UI) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'rule';
+      b.dataset.op = o.key;
+      b.innerHTML = `<span class="rule-top"><span class="rule-name">${o.name}</span><span class="rule-eg" aria-hidden="true">${o.eg}</span></span><span class="rule-desc">${o.desc}</span>`;
+      b.addEventListener('click', () => {
+        const on = !S.settings.mathOps[o.key];
+        if (!on && MATH_OPS.filter(k => S.settings.mathOps[k]).length === 1) { flashNote('opsNote', 'Keep at least one type on.'); return; }
+        S.settings.mathOps[o.key] = on;
+        saveSettings();
+        syncSettings();
+      });
+      opsEl.appendChild(b);
+    }
+    $('extraMath').addEventListener('change', ev => {
+      S.settings.extraMath = ev.target.checked;
+      if (!S.settings.extraMath && S.settings.mode === 'math') S.settings.mode = 'live';
+      saveSettings();
+      syncSettings();
+    });
+  }
+
   /* ---------- Match settings: ladder and free play ---------- */
   function buildMatchSettings() {
     buildSeg('oppSeg', OPPS.map(o => ({ v: o.v, html: o.name })), 'matchOpp');
@@ -2656,8 +2905,10 @@ fieldset.settings:disabled { opacity: .5; }
     catch (err) { fmt = { format: d => d.toLocaleString() }; }
     for (const h of S.history.slice(0, 8)) {
       const li = document.createElement('li');
-      const when = fmt.format(new Date(h.at)) + (h.mode === 'comeback' ? ' · Comebacks' : h.mode === 'match' ? ' · Match' + (h.result ? ', ' + h.result : '') : '');
-      const cells = [['h-when', when], ['', `${num(h.acc) || 0}%`], ['', num(h.avg) === null ? '–' : `${num(h.avg)} ms`], ['h-false', String(num(h.falses) || 0)], ['h-pace', `${num(h.pace) || 0} ms`]];
+      const when = fmt.format(new Date(h.at)) + (h.mode === 'comeback' ? ' · Comebacks' : h.mode === 'match' ? ' · Match' + (h.result ? ', ' + h.result : '') : h.mode === 'math' ? ` · Math, ${num(h.dur) || 0} s` : '');
+      const cells = h.mode === 'math'
+        ? [['h-when', when], ['', String(num(h.score) || 0)], ['', num(h.avg) === null ? '–' : `${(num(h.avg) / 1000).toFixed(1)} s`], ['h-false', '–'], ['h-pace', `${num(h.dur) || 0} s`]]
+        : [['h-when', when], ['', `${num(h.acc) || 0}%`], ['', num(h.avg) === null ? '–' : `${num(h.avg)} ms`], ['h-false', String(num(h.falses) || 0)], ['h-pace', `${num(h.pace) || 0} ms`]];
       for (const [cls, text] of cells) {
         const span = document.createElement('span');
         if (cls) span.className = cls;
@@ -2670,6 +2921,8 @@ fieldset.settings:disabled { opacity: .5; }
     $('bestNote').textContent = clean.length
       ? `Best live average in a round with 80% or more caught: ${Math.min(...clean.map(h => h.avg))} ms.`
       : 'Catch 80% or more in a live round to set a best average.';
+    const bests = MATH_DURS.filter(d => S.mathBest.best[d]).map(d => `${d} s: ${S.mathBest.best[d]}`);
+    if (bests.length) $('bestNote').textContent += ` Best math sprints: ${bests.join(' · ')}.`;
   }
 
   /* ---------- Settings panel ---------- */
@@ -2718,13 +2971,14 @@ fieldset.settings:disabled { opacity: .5; }
     buildSeg('lenSeg', LENGTHS.map(n => ({ v: n, html: `${n}<small>patterns</small>` })), 'length');
     buildSeg('pilesSeg', PILE_COUNTS.map(n => ({ v: n, html: `${n}<small>piles</small>` })), 'piles');
     buildMatchSettings();
+    buildMathSettings();
     for (const [id, key] of [['adaptive', 'adaptive'], ['memory', 'memory'], ['assistBox', 'assist'], ['focus', 'focus']]) {
       $(id).addEventListener('change', ev => { S.settings[key] = ev.target.checked; saveSettings(); syncSettings(); });
     }
   }
   function syncSettings() {
     for (const b of $('rules').children) b.setAttribute('aria-pressed', String(!!S.settings.rules[b.dataset.rule]));
-    for (const [id, key] of [['modeSeg', 'mode'], ['paceSeg', 'pace'], ['deckSeg', 'deck'], ['lenSeg', 'length'], ['pilesSeg', 'piles'], ['flinchSeg', 'flinch'], ['oppSeg', 'matchOpp'], ['mlenSeg', 'matchLen'], ['burnSeg', 'burn']]) {
+    for (const [id, key] of [['modeSeg', 'mode'], ['paceSeg', 'pace'], ['deckSeg', 'deck'], ['lenSeg', 'length'], ['pilesSeg', 'piles'], ['flinchSeg', 'flinch'], ['oppSeg', 'matchOpp'], ['mlenSeg', 'matchLen'], ['burnSeg', 'burn'], ['mdurSeg', 'mathDur']]) {
       for (const b of $(id).children) b.setAttribute('aria-pressed', String(b.dataset.v === String(S.settings[key])));
     }
     $('adaptive').checked = S.settings.adaptive;
@@ -2736,6 +2990,15 @@ fieldset.settings:disabled { opacity: .5; }
     $('modeNote').textContent = (MODES.find(m => m.v === S.settings.mode) || MODES[0]).note;
     for (const el of document.querySelectorAll('[data-only]')) el.hidden = !el.dataset.only.split(' ').includes(S.settings.mode);
     syncMatchSettings();
+    for (const b of $('ops').children) b.setAttribute('aria-pressed', String(!!S.settings.mathOps[b.dataset.op]));
+    $('extraMath').checked = S.settings.extraMath;
+    for (const b of $('modeSeg').children) if (b.dataset.v === 'math') b.hidden = !S.settings.extraMath;
+    $('modeSeg').classList.toggle('four', S.settings.extraMath);
+    felt.classList.toggle('math', mathMode());
+    $('keysHint').innerHTML = mathMode()
+      ? (TOUCH ? 'Type the answer on the number pad' : 'Type the answer · <kbd>Esc</kbd> to stop')
+      : (TOUCH ? 'Tap the table to slap' : '<kbd>Space</kbd> or tap to slap · <kbd>Esc</kbd> to stop');
+    if (!running()) mathIdle();
     renderHud();
   }
   function buildRanks() {
@@ -2767,11 +3030,25 @@ fieldset.settings:disabled { opacity: .5; }
   felt.addEventListener('pointerdown', ev => {
     if (ev.pointerType === 'mouse' && ev.button !== 0) return;
     if (ev.target.closest('button, a, input, label')) return;
+    if (mathMode()) { if (S.phase === 'live') { ev.preventDefault(); mathIn.focus({ preventScroll: true }); } return; }
     ev.preventDefault();
     slap(eventTime(ev));
   });
+  // The math sprint starts from the click, where iOS allows opening the number pad.
+  felt.addEventListener('click', ev => {
+    if (!mathMode() || running() || ev.target.closest('button, a, input, label')) return;
+    if (RP.on) { stopReplay(); return; }
+    if (S.phase === 'done' && performance.now() - S.doneAt < 900) return;
+    start();
+  });
   document.addEventListener('keydown', ev => {
     if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
+    // During a math sprint every key belongs to the answer box.
+    if (mathMode() && running()) {
+      if (ev.key === 'Escape') { ev.preventDefault(); stop(); }
+      else if (ev.target !== mathIn && /^(\d|Backspace)$/.test(ev.key)) mathIn.focus({ preventScroll: true });
+      return;
+    }
     const isSpace = ev.key === ' ' || ev.code === 'Space';
     if (S.phase === 'recall' || S.phase === 'lockin') {
       if (ev.key === 'Escape') { ev.preventDefault(); stop(); return; }
@@ -2807,7 +3084,6 @@ fieldset.settings:disabled { opacity: .5; }
     syncSettings();
     drawPile(SAMPLE, false);
     promptEl.innerHTML = START_PROMPT;
-    if (TOUCH) $('keysHint').textContent = 'Tap the table to slap';
     say('', '', 'Your reaction time shows up here after every catch.');
     renderHistory();
     const last = data.last;
@@ -2824,7 +3100,7 @@ fieldset.settings:disabled { opacity: .5; }
 
   window.addEventListener('resize', () => { if (matchMode() && running()) renderSeats(); });
 
-  window.ewt = { patternsOf, targetCard, lureCard, neutralCard, drillCard, falseKind, isRun, makeWinScript, S, CB, RP, MT, flinch };
+  window.ewt = { patternsOf, targetCard, lureCard, neutralCard, drillCard, falseKind, isRun, makeWinScript, S, CB, RP, MT, MS, flinch };
   const hot = window.claude && window.claude.hot;
   if (hot && typeof hot.ready === 'function') hot.ready(boot);
   else boot((hot && hot.data) || {});

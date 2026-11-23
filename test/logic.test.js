@@ -426,5 +426,53 @@ test('cleanHistory keeps match entries and their new fields', () => {
   assert.strictEqual(E.cleanHistory([{ at: 1, mode: 'bogus' }])[0].mode, 'live');
 });
 
+/* ---------- Mental math ---------- */
+test('mathQuestion: Zetamac ranges, exact answers, only the enabled types', () => {
+  const ALL = { add: true, sub: true, mul: true, div: true };
+  const seen = {};
+  let prev = null;
+  for (let i = 0; i < 20000; i++) {
+    const q = E.mathQuestion(ALL, prev);
+    seen[q.type] = (seen[q.type] || 0) + 1;
+    if (prev) assert.notStrictEqual(q.text, prev.text, 'no immediate repeat');
+    prev = q;
+    if (q.type === 'add') { assert.ok(q.x >= 2 && q.x <= 100 && q.y >= 2 && q.y <= 100); assert.strictEqual(q.answer, q.x + q.y); }
+    if (q.type === 'sub') { assert.ok(q.y >= 2 && q.y <= 100 && q.answer >= 2 && q.answer <= 100); assert.strictEqual(q.x - q.y, q.answer); }
+    if (q.type === 'mul') {
+      const [s, l] = q.x <= 12 && q.y >= 2 && q.y <= 100 ? [q.x, q.y] : [q.y, q.x];
+      assert.ok(s >= 2 && s <= 12 && l >= 2 && l <= 100, q.text);
+      assert.strictEqual(q.answer, q.x * q.y);
+    }
+    if (q.type === 'div') { assert.ok(q.y >= 2 && q.y <= 12 && q.answer >= 2 && q.answer <= 100); assert.strictEqual(q.x, q.y * q.answer); }
+    assert.ok(/^\d+ [+−×÷] \d+$/.test(q.text), q.text);
+  }
+  assert.deepStrictEqual(Object.keys(seen).sort(), ['add', 'div', 'mul', 'sub']);
+  for (let i = 0; i < 500; i++) assert.strictEqual(E.mathQuestion({ mul: true }).type, 'mul');
+  assert.strictEqual(E.mathQuestion({}).type, 'add', 'falls back to addition');
+});
+test('mathSummary: score, average per type, slowest questions', () => {
+  const s = E.mathSummary([
+    { type: 'add', text: '2 + 3', answer: 5, ms: 1000 },
+    { type: 'add', text: '40 + 41', answer: 81, ms: 3000 },
+    { type: 'div', text: '84 ÷ 7', answer: 12, ms: 6200 },
+  ]);
+  assert.strictEqual(s.score, 3);
+  assert.strictEqual(s.avg, 3400);
+  assert.deepStrictEqual(s.byType, [{ type: 'add', n: 2, avg: 2000 }, { type: 'div', n: 1, avg: 6200 }]);
+  assert.deepStrictEqual(s.slowest[0], { text: '84 ÷ 7', answer: 12, ms: 6200 });
+  assert.deepStrictEqual(E.mathSummary([]), { score: 0, avg: null, byType: [], slowest: [] });
+});
+test('math settings: hidden unless turned on, durations, at least one type', () => {
+  assert.strictEqual(E.cleanSettings({ mode: 'math' }).mode, 'live', 'Math needs the extra drill turned on');
+  assert.strictEqual(E.cleanSettings({ mode: 'math', extraMath: true }).mode, 'math');
+  assert.strictEqual(E.cleanSettings({}).mathDur, 120);
+  assert.strictEqual(E.cleanSettings({ mathDur: 180 }).mathDur, 180);
+  assert.strictEqual(E.cleanSettings({ mathDur: 90 }).mathDur, 120);
+  assert.deepStrictEqual(E.cleanSettings({ mathOps: { add: false, sub: false, mul: false, div: false } }).mathOps, { add: true, sub: false, mul: false, div: false });
+  assert.deepStrictEqual(E.cleanMathBest({ best: { 60: 21, 120: 'x', 999: 4 } }), { best: { 60: 21, 120: 0, 180: 0 } });
+  const h = E.cleanHistory([{ at: 9, mode: 'math', acc: 0, avg: 2400, falses: 0, pace: 0, deck: 'drill', score: 44, dur: 120 }]);
+  assert.deepStrictEqual(h[0], { at: 9, mode: 'math', acc: 0, avg: 2400, falses: 0, pace: 0, deck: 'drill', score: 44, dur: 120 });
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exitCode = failed ? 1 : 0;
